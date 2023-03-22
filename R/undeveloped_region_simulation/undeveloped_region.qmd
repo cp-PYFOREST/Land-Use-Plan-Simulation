@@ -16,287 +16,163 @@ library(units)
 
 ```{r}
 
-source(knitr::purl(here("R",'src', "law_simulator.qmd")))
+source(knitr::purl(here('src', "lup_simulator.qmd")))
 
 ```
+
+
+
 
 ```{r}
 study_boundary <- st_read('/capstone/pyforest/data/study_boundary/study_boundary.shp')
 
-dimensions <- property_dimensions(desired_area = 40000000) 
+developed_region <- st_read('/capstone/pyforest/data/developed_region/developed_region.gpkg')
+
+dimensions <- property_dimensions(desired_area = 40000000,
+                                  hedgerow_width = 0,
+                                  width_paddock = 1,
+                                  height_paddock = 1) 
 
 study_gridded <- grid_rotate(boundary_property = study_boundary, x_y = dimensions) |> st_as_sf()
 
 
 
 tmap_mode('view')
-tm_shape(study_boundary) +
+tm_shape(study_gridded) +
    tm_borders(col = 'red') +
-  tm_shape(study_gridded) +
-   tm_borders(col = 'red') 
+  tm_shape(developed_region) +
+   tm_sf(col = 'black') 
 
 ```
 
 ```{r}
-#read in undeveloped region
-undeveloped_region <- st_read('/capstone/pyforest/data/undev/undev.shp')
+cell_undeveloped <- st_difference(study_gridded, developed_region)
 
-# Find the inverse which is developed region
-dev_region <- st_sym_difference(study_boundary,undeveloped_region)
-
-# take gridded and erase the areas that are developed
-undeveloped_gridded <- st_erase(study_gridded,dev_region )
-
-# clean 
-undeveloped_gridded <- st_cast(undeveloped_gridded, to = 'POLYGON') |>
-  st_make_valid()
-
-# Creating cells and 
-
-plot(undeveloped_gridded)
-tm_shape(undeveloped_gridded) +
-  tm_sf()
+tm_shape(cell_undeveloped) +
+   tm_sf(col = 'red')
 ```
 
 ```{r}
-road <- st_read(here('/capstone/pyforest/data/dissolved_road/dissolved_road.gpkg'))
+study_undeveloped <- st_difference(study_boundary, developed_region)
+tm_shape(study_undeveloped) +
+   tm_sf(col = 'red')
 
-
-undev_grid <- st_(undeveloped_gridded, road)
-
-
-
-#st_write(undeveloped_gridded,'/Users/romero61/../../capstone/pyforest/data/undev/undev_grid.gpkg' )
-
-neg_buffer <- st_buffer(undev_grid, dist = -50)
-
-tm_shape(neg_buffer) +
-  tm_sf()
-
-pos_buffer <- st_buffer(neg_buffer, dist = 50)
-
-tm_shape(pos_buffer) +
-  tm_sf()
-```
-
-```{r}
-
-
-private_protected_areas <- st_read('/Users/romero61/../../capstone/pyforest/data/certificadas/certificadas.shp')
-
-urban <-  st_read('/Users/romero61/../../capstone/pyforest/data/urban_areas/urban_areas.shp')
-
-parks <- st_read("/Users/romero61/../../capstone/pyforest/data/wildlife_protection_areas/ASP_ROCC.shp")
-
-
-indigenous_land <- st_read('/Users/romero61/../../capstone/pyforest/data/indigenous_land/native_land.shp')
-
-lup_bourder <- st_read('/Users/romero61/../../capstone/pyforest/data/permited_land_use/limite_put.shp')
-
-
-
-# Combine areas  that are private, protected or developed
-
-
-# crop indegenous land to study area
-
-study_boundary_indegenous <- st_intersection(study_boundary, indigenous_land)
-#combine
-study_boundary_indegenous2 <- st_union(study_boundary,study_boundary_indegenous, by_feature = TRUE, is_coverage = TRUE)
-
-
-tm_shape(urban) +
-   tm_borders() 
-
-
-#To find the undeveloped area erase the study region using native land, nationals parks, and Land Use Plans. 
-chaco_less_nl <- st_difference(study_gridded, native_land)
-plot(chaco_less_nl)
-chaco_less_n2 <- st_erase(study_gridded, native_land)
-
-
-chaco_less_nl_p <-st_difference(chaco_less_nl , parks)
-chaco_less_nl_p_lup <- st_difference(chaco_less_nl_p ,lup_bourder)
-chaco_less_nl_p_lup_urb <- st_difference(chaco_less_nl_p_lup,urban)
-
-#convert the resoult to sf object and explot the multipolygon 
-expansion <- st_as_sf(chaco_less_nl_p_lup_urb)
-expansion <- st_cast(expansion, "POLYGON")|>
-  mutate(area = st_area(expansion))|>
-  mutate(area = as.numeric(area))|>
-  mutate(area = area/10000)|>
-  filter(area >= 1)
+study_gridded2 <- grid_rotate(boundary_property = study_undeveloped, x_y = dimensions) |> st_as_sf()
+tm_shape(cell_undeveloped) +
+   tm_sf(col = 'blue')+
+  tm_shape(study_gridded2) +
+   tm_sf(col = 'forestgreen')
 
 ```
 
 ```{r}
+grd_no_rotation <- sf::st_make_grid(study_undeveloped,
+                       cellsize = c(dimensions[[1]], dimensions[[2]]),
+                       n = 150) |> st_as_sf()
 
+grd_no_rotation_study <- st_intersection(grd_no_rotation,study_boundary)
 
-#dist_filadelphia <- st_read('/capstone/pyforest/data/dist_filadelphia/dist_filadelphia.shp')
+no_rotation_undeveloped <- st_difference(grd_no_rotation_study, developed_region) 
 
-#roads <- st_read(here('/capstone/pyforest/data/roads_hydrology/ly_via2.shp'))  
-
-#dept <- st_read(here('/capstone/pyforest/data/Political_Boundaries/departamento.shp')) |>
-#  filter(dpto %in% c('P','Q', 'R')) 
-
-district <- st_read(here('/capstone/pyforest/data/Political_Boundaries/distritos.shp')) |>
-  filter(cod_dpto %in% c('P','Q', 'R')) |>
-  select(cod_dpto, codigo, nom_dist)
-
-#study_boundary <- st_union(dept, is_coverage = TRUE)
-
-#st_write(study_boundary, '/capstone/pyforest/data/study_boundary/study_boundary.shp')
-
-
-
-mock_properties <- st_read(here('/capstone/pyforest/data/mock_properties/mock_properties.shp'))
-
+tm_shape(no_rotation_undeveloped) +
+   tm_sf(col = 'forestgreen')
 
 ```
 
-```{r}
-#roads_buffer <- st_buffer(roads, dist = 50, nQuadSegs = 60)
-#plot(roads_buffer)
-
-#study_roads <- st_difference(study_boundary, roads)
-```
 
 ```{r}
 
-undeveloped <- st_erase(undeveloped_region, road)
-
-#st_write(undeveloped, '/capstone/pyforest/data/undeveloped.gpkg')
-tmap_mode('view')
-tmap_options(check.and.fix = TRUE)
-tm_shape(undeveloped) +
-   tm_fill(col = 'red') 
-
-```
-
-```{r}
-neg_buffer <- st_buffer(undeveloped, dist = -50)
-
-tm_shape(neg_buffer) +
-  tm_sf()
-
-pos_buffer <- st_buffer(neg_buffer, dist = 50)
-
-tm_shape(pos_buffer) +
-  tm_sf()
-```
-
-```{r}
-#gridfirst
-
-protected_developed <- st_difference(study_boundary, pos_buffer)
-
-plot(protected_developed)
-undev_grid <- st_difference(study_gridded, protected_developed) #4860 obs
-plot(undev_grid)
-
-
-```
-
-```{r}
-#gridfirst
-undev_grid <- st_cast(undev_grid, to = 'POLYGON')
-
-
-```
-
-```{r}
-
-```
-
-```{r}
-
-#pos first
-undeveloped_gridded <- grid_rotate(boundary_property = pos_buffer, x_y = dimensions) |> st_as_sf()
-
-undeveloped_gridded2 <- st_cast(undeveloped_gridded, to = 'POLYGON')
-
-undeveloped_gridded100 <- grid_rotate(boundary_property = pos_buffer, x_y = dimensions2) |> st_as_sf()
-
-undeveloped_gridded1002 <- st_cast(undeveloped_gridded100, to = 'POLYGON')
-
-
-
-plot(undeveloped_gridded2)
-tmap_mode('view') 
-#tmap_options(check.and.fix = TRUE)
-#
-tm_shape(pos_buffer) +
-  tm_sf(col = 'red') +
-tm_shape(undeveloped_gridded2) +
-  tm_sf(col = 'blue') +
-  tm_shape(undeveloped_gridded1002) +
-  tm_sf(col = 'green') +
-    tm_shape(undev_grid) +
-  tm_sf(col = 'beige') 
-```
-
-```{r}
-
-```
-
-```{r}
-average_properties <- undeveloped_gridded2 |> 
-  mutate(cat = seq(1:nrow(undeveloped_gridded2)), 
-         area = st_area(undeveloped_gridded2), .before = x) |>
+undeveloped1 <- no_rotation_undeveloped |> 
+  mutate(cat = seq(1:nrow(no_rotation_undeveloped)), 
+         area = st_area(no_rotation_undeveloped), .before = x) |>
   drop_units() |>
-  filter(area >= 200000 & area < 2000000 ) |>
-  rename(geometry = x)
+  filter(area >= 2000000  ) |>
+  rename(geometry = x) |> 
+  select(cat, area)
 
-average_properties2 <- undeveloped_gridded2 |> 
-  mutate(cat = seq(1:nrow(undeveloped_gridded2)), 
-         area = st_area(undeveloped_gridded2), .before = x) |>
-  drop_units() |>
-  filter(area > 20000000 ) |>
-  rename(geometry = x)
+# undeveloped2 <- study_gridded2 |> 
+#   mutate(cat = seq(1:nrow(study_gridded2)), 
+#          area = st_area(study_gridded2), .before = x) |>
+#   drop_units() |>
+#   filter(area >= 2000000  ) |>
+#   rename(geometry = x) |> 
+#   select(cat, area)
+# 
+# 
+# undeveloped3 <- cell_undeveloped |> 
+#   mutate(cat = seq(1:nrow(cell_undeveloped)), 
+#          area = st_area(cell_undeveloped), .before = x) |>
+#   drop_units() |>
+#   filter(area >= 2000000) |>
+#   rename(geometry = x) |> 
+#   select(cat, area)
+
+#st_write(no_rotation_undeveloped, '/capstone/pyforest/data/undeveloped_region/undeveloped_region_complete.shp')
+```
+
+```{r}
+st_area(study_undeveloped)
+sum(undeveloped1$area)
+sum(undeveloped2$area)
+sum(undeveloped3$area)
+
+```
+
+
+```{r}
+tm_shape(study_undeveloped) +
+   tm_sf(col = 'red')+
+tm_shape(undeveloped3) +
+   tm_sf(col = 'black')+
+  tm_shape(undeveloped2) +
+   tm_sf(col = 'black') +
+  tm_shape(undeveloped1) +
+   tm_sf(col = 'black')
+
 ```
 
 ```{r}
 #fix for broken portions of larger property
 # Assuming your dataframes are named average_properties and average_properties2
-
-# Find the touching polygons
-touching_polygons <- st_touches(average_properties, average_properties2)
-
-# Get the indices of the touching polygons in average_properties
-touching_indices <- which(lengths(touching_polygons) > 0)
-
-# Subset the touching polygons in average_properties
-small_corners <- average_properties[touching_indices, ]
-
-# Subset polygons being touched by small corners
-poly_corners <- average_properties2[touching_indices,]
-# Create a union with the larger polygons in average_properties2
-mock_union <- st_union(small_corners,average_properties2, by_feature = TRUE)
-
-
-#st_write(small_corners, '/capstone/pyforest/data/mock_properties/small_corners.shp')
- #tm_shape(average_properties) +
- #  tm_sf()
+# 
+# # Find the touching polygons
+# touching_polygons <- st_touches(average_properties, average_properties2)
+# 
+# # Get the indices of the touching polygons in average_properties
+# touching_indices <- which(lengths(touching_polygons) > 0)
+# 
+# # Subset the touching polygons in average_properties
+# small_corners <- average_properties[touching_indices, ]
+# 
+# # Subset polygons being touched by small corners
+# poly_corners <- average_properties2[touching_indices,]
+# # Create a union with the larger polygons in average_properties2
+# mock_union <- st_union(small_corners,average_properties2, by_feature = TRUE)
+# 
+# 
+# #st_write(small_corners, '/capstone/pyforest/data/mock_properties/small_corners.shp')
+#  #tm_shape(average_properties) +
+#  #  tm_sf()
 ```
 
 ```{r}
 #tmap_options(check.and.fix = FALSE)
-
-snaps <- st_snap(average_properties,average_properties2,tolerance = 700) |> st_make_valid()
-
-tm_shape(average_properties) +
-  tm_polygons(col = 'black')+
-  tm_shape(average_properties2) +
-  tm_polygons(col = 'dodgerblue')+
-    tm_shape(snaps) +
-  tm_polygons(col = 'red')
-```
+# 
+# snaps <- st_snap(average_properties,average_properties2,tolerance = 700) |> st_make_valid()
+# 
+# tm_shape(average_properties) +
+#   tm_polygons(col = 'black')+
+#   tm_shape(average_properties2) +
+#   tm_polygons(col = 'dodgerblue')+
+#     tm_shape(snaps) +
+#   tm_polygons(col = 'red')
+# ```
 
 ```{r}
-tm_shape(average_properties) +
-  tm_polygons(col = 'red')+
-  tm_shape(average_properties2) +
-  tm_polygons(col = 'dodgerblue')+
-    tm_shape(poly_corners) +
-  tm_polygons(col = 'forestgreen')
+# tm_shape(average_properties) +
+#   tm_polygons(col = 'red')+
+#   tm_shape(average_properties2) +
+#   tm_polygons(col = 'dodgerblue')+
+#     tm_shape(poly_corners) +
+#   tm_polygons(col = 'forestgreen')
 ```

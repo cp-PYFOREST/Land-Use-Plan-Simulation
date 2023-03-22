@@ -54,7 +54,7 @@ property_dimensions <- function(desired_area = 999000 ,
 grid_rotate <-
   function(boundary_property = property_boundary,
            x_y = pad_hedg_dim) {
-    coords_df <- st_coordinates(property_boundary)
+    coords_df <- st_coordinates(boundary_property)
     number_col <- ncol(coords_df)
     x1 <- coords_df[1, 1]
     y1 <- coords_df[1, 2]
@@ -89,7 +89,7 @@ grid_rotate <-
     grd <-
       sf::st_make_grid(tran(inpoly, -rotang, center),
                        cellsize = c(x_y[[1]], x_y[[2]]),
-                       n = 100)
+                       n = 150)
     
     
     
