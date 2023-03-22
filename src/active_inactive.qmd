@@ -1,0 +1,258 @@
+```{r}
+#| include: false
+library(sf)
+library(tmap)
+library(tidyverse)
+library(here)
+library(knitr)
+library(units)
+```
+
+```{r}
+#| include: false
+#| warning: false
+
+source(knitr::purl(here("R",'src', "boundary_registry_data.qmd")))
+rm(forestry_registry)
+#property_boundaries
+#forestry_registry
+```
+
+```{r}
+#| include: false
+#| warning: false
+
+
+
+# Divide  into inactive 
+# Create a subset of the property_boundary dataset containing only properties with estado == 1, and select only the columns we need
+properties <- property_boundary |> 
+  select(id, put_id, anho_capa, estado, cod_dpto, cod_dist) |> 
+  mutate(year_inactive = NA, 
+         to_putid = NA, .before = geometry)
+
+# find the inactive properties from subset that interesect the larger dataset
+property_intersect <- st_intersection(properties, property_boundary) 
+
+# Get a sorted list of the unique inactive put_ids
+properties_put_ids <- sort(properties$put_id)
+
+
+
+# Loop through the inactive put_ids
+for (i in properties_put_ids){
+  # Filter the intersection dataset to only include rows where the put_id matches the current iteration,and select only the put_id.1, anho_capa, and anho_capa.1 columns (put_id.1 is the ID of the property that this property was merged into, anho_capa is the year this property became inactive, and anho_capa.1 is theyear the property it was merged into became active)
+  temp_df <- property_intersect %>%
+    filter(put_id == i) %>%
+    select(put_id, put_id.1, anho_capa, anho_capa.1) |>
+    # Create a new column to store the percentage of the current property that overlaps with the merged property
+    mutate(area = NA)
+
+    # Get the area of the merged property that the current property overlaps with
+  area_i <-  temp_df |>
+  filter(put_id.1 == i) |>
+  st_area() |>
+  drop_units()
+  
+    # Calculate the percentage of the current property that overlaps with the merged property,and filter the temp_df to only include rows where this percentage is greater than 25%
+  temp_df['area'] <- (drop_units(st_area(temp_df))/ area_i) * 100
+  temp_df <- temp_df |>
+    filter(area > 25)
+  
+    # If there's only one row in temp_df, use the current year as the year_inactive for the current property
+  if(nrow(temp_df) == 1){
+    # if there's only one row, use the current year
+    properties <- properties %>% 
+      mutate(year_inactive = ifelse(put_id == i, 2023, year_inactive),
+             to_putid = ifelse(put_id == i, temp_df$put_id.1, to_putid))
+  } else {
+    
+    # If there's more than one row in temp_df, get the current_year (the year the current property became inactive) and the next_year (the year the merged property became active after the current_year), and update the year_inactive and to_putid columns accordingly
+    
+    current_year <- temp_df$anho_capa[1]
+    next_year <- min(temp_df$anho_capa.1[temp_df$anho_capa.1 > current_year])
+    if (is.infinite(next_year)) {
+      # if there's no next higher year, use 2023
+      properties <- properties %>% 
+        mutate(year_inactive = ifelse(put_id == i & is.na(year_inactive), 2023, year_inactive),
+               to_putid = ifelse(put_id == i & is.na(to_putid), temp_df$put_id.1[which(temp_df$anho_capa == current_year)], to_putid))
+    } else {
+      properties <- properties %>% 
+        mutate(year_inactive = ifelse(put_id == i & is.na(year_inactive), next_year, year_inactive),
+               to_putid = ifelse(put_id == i & is.na(to_putid), temp_df$put_id.1[which(temp_df$anho_capa.1 == next_year)], to_putid))
+    }
+  }
+}  
+
+
+#saveRDS(properties,'/capstone/pyforest/data/active_inactive/active_inactive.rds')
+#rm(inactive_intersect, temp_df, current_year, i, inactive_put_ids, next_year)
+```
+
+
+
+
+
+```{r}
+#| include: false
+#| warning: false
+
+
+
+# # Divide  into active 
+# 
+# active_properties <- property_boundary %>%
+#   filter(estado == 0) |>
+#   select(id, put_id, anho_capa, estado, cod_dpto, cod_dist) |> 
+#   mutate(year_inactive = NA, 
+#          to_putid = NA, .before = geometry)
+# 
+# active_put_ids <- sort(active_properties$put_id)
+# active_intersect <- st_intersection(active_properties, property_boundary)
+# for (i in active_put_ids){
+#   temp_df <- active_intersect %>%
+#     filter(put_id == i) %>%
+#     select(put_id, put_id.1, anho_capa, anho_capa.1) |>
+#     mutate(area = NA)
+#   
+#   area_i <-  active_intersect |>
+#   filter(put_id.1 == i) |>
+#   st_area() |>
+#   drop_units()
+#   
+#   temp_df['area'] <- (drop_units(st_area(temp_df))/ area_i) * 100
+#   
+#   temp_df <- temp_df |>
+#     filter(area > 25)
+# 
+#   if(nrow(temp_df) == 1){
+#     # if there's only one row, set the year_inactive to 2022
+#     active_properties <- active_properties %>% 
+#       mutate(year_inactive = ifelse(put_id == i, 2022, year_inactive),
+#              to_putid = ifelse(put_id == i, temp_df$put_id.1, to_putid))
+#   } else {
+#     current_year <- temp_df$anho_capa[1]
+#     next_year <- min(temp_df$anho_capa.1[temp_df$anho_capa.1 > current_year])
+#     if (is.infinite(next_year)) {
+#       # if there's no next higher year, set the year_inactive to 2022
+#       active_properties <- active_properties %>% 
+#         mutate(year_inactive = ifelse(put_id == i & is.na(year_inactive), 2022, year_inactive),
+#                to_putid = ifelse(put_id == i & is.na(to_putid), temp_df$put_id.1[which(temp_df$anho_capa == current_year)], to_putid))
+#     } else {
+#       active_properties <- active_properties %>% 
+#         mutate(year_inactive = ifelse(put_id == i & is.na(year_inactive), next_year, year_inactive),
+#                to_putid = ifelse(put_id == i & is.na(to_putid), temp_df$put_id.1[which(temp_df$anho_capa.1 == next_year)], to_putid))
+#     }
+#   }
+# }
+# 
+# active_inactive <- bind_rows(active_properties, inactive_properties)
+# 
+# 
+# saveRDS(active_inactive,'/capstone/pyforest/data/active_inactive.rds')
+#rm(active_properties,inactive_properties,active_intersect, temp_df, current_year, i, active_put_ids, next_year, property_boundary)
+
+
+
+```
+
+```{r}
+
+# t_df1894 <- property_intersect |>
+#   filter(put_id == 'PUT1894') |>
+#   select(put_id, put_id.1, anho_capa, anho_capa.1) |>
+#   mutate(area = NA) 
+# 
+# 
+# area_i1894 <-  t_df1894 |>
+#   filter(put_id.1 == 'PUT1894') |>
+#   st_area() |>
+#   drop_units()
+# 
+# 
+# t_df1894['area'] <- (drop_units(st_area(t_df1894))/ area_i1894) * 100
+# t_df1894 <- t_df1894 |>
+#     filter(area > 25)
+# 
+# ####
+# 
+# t_df2589 <- property_intersect |>
+#   filter(put_id == 'PUT2589') |>
+#   select(put_id, put_id.1, anho_capa, anho_capa.1) |>
+#   mutate(area = NA) 
+# 
+# 
+# area_i2589 <-  t_df2589 |>
+#   filter(put_id.1 == 'PUT2589') |>
+#   st_area() |>
+#   drop_units()
+# 
+# 
+# t_df2589['area'] <- (drop_units(st_area(t_df2589))/ area_i2589) * 100
+# t_df2589 <- t_df2589 |>
+#     filter(area > 25)
+# 
+# 
+# 
+# current_year <- t_df2589$anho_capa[1]
+#     next_year <- min(t_df2589$anho_capa.1[t_df2589$anho_capa.1 > current_year])
+#     if (is.infinite(next_year)) {
+#       # if there's no next higher year, use the current year
+#       properties <- properties %>% 
+#         mutate(year_inactive = ifelse(put_id == i & is.na(year_inactive), current_year, year_inactive),
+#                to_putid = ifelse(put_id == i & is.na(to_putid), t_df2589$put_id.1[which(t_df2589$anho_capa == current_year)], to_putid))
+#     } else {
+#       properties <- properties %>% 
+#         mutate(year_inactive = ifelse(put_id == i & is.na(year_inactive), next_year, year_inactive),
+#                to_putid = ifelse(put_id == i & is.na(to_putid), t_df2589$put_id.1[which(t_df2589$anho_capa.1 == next_year)], to_putid))
+#     }
+#     
+#     
+#     
+#     
+# 
+# #####
+# t_df3224 <- property_intersect |>
+#   filter(put_id == 'PUT3224') |>
+#   select(put_id, put_id.1, anho_capa, anho_capa.1) |>
+#   mutate(area = NA) 
+# 
+# 
+# area_i3224 <-  t_df3224 |>
+#   filter(put_id.1 == 'PUT3224') |>
+#   st_area() |>
+#   drop_units()
+# 
+# 
+# t_df3224['area'] <- (drop_units(st_area(t_df3224))/ area_i) * 100
+# t_df3224 <- t_df3224 |>
+#     filter(area > 25)
+# 
+# ####
+# t_df1996 <- property_intersect |>
+#   filter(put_id == 'PUT1996') |>
+#   select(put_id, put_id.1, anho_capa, anho_capa.1) |>
+#   mutate(area = NA) 
+# 
+# 
+# area_i1996 <-  t_df1996 |>
+#   filter(put_id.1 == 'PUT1996') |>
+#   st_area() |>
+#   drop_units()
+# 
+# 
+# t_df1996['area'] <- (drop_units(st_area(t_df1996))/ area_i1996) * 100
+# t_df1996 <- t_df1996 |>
+#     filter(area > 25)
+
+# current <- t_df$anho_capa[2]
+# next_index <- which(temp_df$anho_capa.1 > current_year)[1]
+# 
+# # find the index of the smallest year greater than the current year
+# next_index <- which(temp_df$anho_capa.1 > current_year)[1]
+# # get the next year
+# next_year <- temp_df$anho_capa.1[next_index]
+# inactive_properties['year_inactive'][i] <- next_year
+```
+
+

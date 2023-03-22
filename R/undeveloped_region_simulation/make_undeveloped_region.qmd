@@ -1,0 +1,159 @@
+---
+editor: 
+  markdown: 
+    wrap: 72
+---
+ 
+```{r}
+library(sf)
+library(tmap)
+library(tidyverse)
+library(here)
+library(knitr)
+library(mapview)
+library(units)
+```
+ 
+ 
+```{r}
+
+source(knitr::purl(here("R",'src', "law_simulator.qmd")))
+source(knitr::purl(here("R",'src', "boundary_registry_data.qmd")))
+```
+ 
+ 
+```{r}
+
+undeveloped_region <- st_read('/capstone/pyforest/data/undev/undev.shp')
+#dist_filadelphia <- st_read('/capstone/pyforest/data/dist_filadelphia/dist_filadelphia.shp')
+
+#roads <- st_read(here('/capstone/pyforest/data/roads_hydrology/ly_via2.shp'))  
+
+#dept <- st_read(here('/capstone/pyforest/data/Political_Boundaries/departamento.shp')) |>
+#  filter(dpto %in% c('P','Q', 'R')) 
+
+district <- st_read(here('/capstone/pyforest/data/Political_Boundaries/distritos.shp')) |>
+  filter(cod_dpto %in% c('P','Q', 'R')) |>
+  select(cod_dpto, codigo, nom_dist)
+
+#study_boundary <- st_union(dept, is_coverage = TRUE)
+
+#st_write(study_boundary, '/capstone/pyforest/data/study_boundary/study_boundary.shp')
+
+road <- st_read(here('/capstone/pyforest/data/dissolved_road/dissolved_road.gpkg'))
+
+
+```
+
+
+```{r}
+#roads_buffer <- st_buffer(roads, dist = 50, nQuadSegs = 60)
+#plot(roads_buffer)
+
+#study_roads <- st_difference(study_boundary, roads)
+```
+
+```{r}
+
+undeveloped <- st_erase(undeveloped_region, road)
+
+#st_write(undeveloped, '/capstone/pyforest/data/undeveloped.gpkg')
+tmap_mode('view')
+tmap_options(check.and.fix = TRUE)
+tm_shape(undeveloped) +
+   tm_fill(col = 'red') 
+
+```
+
+
+```{r}
+neg_buffer <- st_buffer(undeveloped, dist = -50)
+
+tm_shape(neg_buffer) +
+  tm_sf()
+
+pos_buffer <- st_buffer(neg_buffer, dist = 50)
+
+tm_shape(pos_buffer) +
+  tm_sf()
+```
+ 
+ 
+
+```{r}
+undev_deptdist <- st_union(undeveloped, district)
+
+tm_shape(undeveloped_region) + 
+  tm_polygons()
+```
+
+
+
+
+```{r}
+
+property_size <- active_inactive |>
+  mutate(property_area = st_area(active_inactive), .before = geometry) |>
+  drop_units() |>
+  st_drop_geometry() 
+
+avg_property <- property_size |>
+  summarize(mean = mean(property_area)) |> 
+  as.integer()
+
+#ggplot(property_size, aes(x = anho_capa, y = property_area)) +
+#  geom_col()
+
+ggplot(property_size, aes(x = property_area)) +
+  geom_histogram()
+
+
+
+```
+ 
+ 
+```{r}
+dimensions <- property_dimensions(desired_area = 40000000) 
+```
+ 
+```{r}
+#property_boundary  <- study_boundary
+undeveloped_gridded <- grid_rotate(boundary_property = pos_buffer, x_y = dimensions) |> st_as_sf()
+
+undeveloped_gridded2 <- st_cast(undeveloped_gridded, to = 'POLYGON')
+
+
+plot(undeveloped_gridded2)
+tmap_mode('view') 
+#tmap_options(check.and.fix = TRUE)
+tm_shape(undeveloped_gridded2) +
+  tm_sf()
+
+average_properties <- undeveloped_gridded2 |> 
+  mutate(cat = seq(1:4740), 
+         area = st_area(undeveloped_gridded2), .before = x) |>
+  drop_units() |>
+  filter(area > 20000000) |>
+  rename(geometry = x)
+#plot(average_properties)
+#st_write(average_properties, '/capstone/pyforest/data/mock_properties/mock_properties.shp')
+ #tm_shape(average_properties) +
+ #  tm_sf()
+```
+
+
+
+ 
+ 
+
+ 
+
+ 
+ 
+```{r}
+tm_shape(limit_lu) +
+  tm_borders(col = 'red')
+```
+ 
+ 
+

@@ -1,0 +1,90 @@
+---
+title: "Expasion_area"
+format: html
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+
+library(terra)
+library(here)
+library(dplyr)
+library(sf)
+library(tmap)
+library(rgdal)
+library(rgeos)
+```
+
+
+```{r}
+#Import the native land and filter by that one that have a land title
+#native_land_sp <- st_read(here("Data", "IL","native_land.shp"))|>
+  #filter(Situacion %in% c("Titulado", "En proceso de titulación"))
+
+#import the chaco region
+#chaco <- st_read(here("chaco_region.shp"))
+
+#Intersect the native_land with the chaco_region so can get only the native land from #the chaco
+#nl_chaco<- st_intersection(chaco,native_land_sp)
+#st_write(nl_chaco,"data/IL/native_land_chaco.shp")
+
+
+#Import the urban land by that one that have a land title
+#urban <- st_read(here("Data", "Urban_areas", "urban_areas.shp"))
+
+#Intersect the native_land with the chaco_region so can get only the native land from the chaco
+#urban_chaco<- st_intersection(chaco,urban)
+#st_write(urban_chaco,"data/Urban_Areas/urban_areas_chaco.shp")
+
+```
+
+
+```{r}
+
+
+private_protected_areas <- st_read(here("Data", "areas_de_conservacion", "areas_certificadas", "certificadas.shp"))
+
+urban <-  readOGR(here("Data", "Urban_areas", "urban_areas_chaco.shp"))
+
+parks <- readOGR(here("Data", "areas_de_conservacion", "parks", "ASP_ROCC.shp"))
+
+chaco_region <- readOGR(here("chaco_region.shp"))
+
+native_land <- readOGR(here("Data", "IL","native_land_chaco.shp")) 
+
+lup_bourder <- readOGR(here("Data", "Permitted_land_use", "limite_put.shp"))
+
+```
+```{r}
+#Check it that everything in the same projection and system
+proj4string(chaco_region)
+proj4string(parks)
+proj4string(lup_bourder)
+proj4string(native_land)
+proj4string(urban_chaco)
+
+```
+
+```{r}
+#to fine the expasion area Erase the chaco region using native land, nationals parks, and de Land Use Plan. 
+chaco_less_nl <- gSymdifference(chaco_region, native_land)
+chaco_less_nl_p <-gSymdifference(chaco_less_nl , parks)
+chaco_less_nl_p_lup <- gSymdifference(chaco_less_nl_p ,lup_bourder)
+chaco_less_nl_p_lup_urb <- gSymdifference(chaco_less_nl_p_lup,urban)
+
+#convert the resoult to sf object and explot the multipolygon 
+expansion <- st_as_sf(chaco_less_nl_p_lup_urb)
+expansion <- st_cast(expansion, "POLYGON")|>
+  mutate(area = st_area(expansion))|>
+  mutate(area = as.numeric(area))|>
+  mutate(area = area/10000)|>
+  filter(area >= 1)
+
+
+st_write(expansion,"data/expansion3.shp")
+tm_shape(chaco_less_nl_p_lup)+
+  tm_fill()
+
+```

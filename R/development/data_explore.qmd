@@ -1,0 +1,122 @@
+---
+title: "Data Explorer"
+format: html
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| message: false
+
+library(terra)
+library(here)
+library(dplyr)
+library(sf)
+library(tmap)
+```
+
+```{r}
+r_bios <- st_read(here("Data", "areas_de_conservacion", "biosphere_chaco", "biosfera_chaco.shp"  ))
+
+ecoregions <- st_read(here("Data", "areas_de_conservacion", "ecorregiones", "forest_statum", "ecoregiones_ROccidental.shp"))
+
+private_protected_areas <- st_read(here("Data", "areas_de_conservacion", "areas_certificadas", "certificadas.shp"))
+
+parks <- st_read(here("Data", "areas_de_conservacion", "parks", "ASP_RORI.shp"))
+
+departament <- st_read(here("Data", "Political","departamento.shp"))
+
+fc_1986 <- st_read(here("Data", "SNMF", "cf_1986.shp")) %>% 
+  st_sf()
+
+#fc_1986_sf <-st_sf (fc_1986)
+
+fc_2000 <- st_read(here("Data", "SNMF", "cf_2000.shp"))
+
+#head(fc_1986)
+```
+
+```{r}
+#Filter only the Departament that are in the Chaco Region
+chaco_dpto <- filter(departament, nom_dpto %in% c("ALTO PARAGUAY", "PDTE. HAYES", "BOQUERON"))
+
+#Calculate area (hectares)
+chaco_dpto <-dplyr::mutate(chaco_dpto, area = sf::st_area(chaco_dpto))|>
+  mutate( area = as.numeric(area))|>
+  mutate(area = area/10000)
+  
+#Print Map
+tm_shape(chaco_dpto)+
+  tm_borders()+
+  tm_text("nom_dpto", size = 1/2)
+
+```
+
+```{r}
+#Dissolve the Chaco Departament to get the interest area
+chaco_region <- st_union(chaco_dpto, by_feature = FALSE, is_coverage = TRUE)|>st_make_valid()
+
+
+#Convert sfc_POLYGON in to a SF
+chaco_region <- st_sf(chaco_region)
+
+#Calculate area (hectares)
+chaco_region <-dplyr::mutate(chaco_region, area = sf::st_area(chaco_region))|>
+  mutate(area = as.numeric(area))|>
+  mutate(area = area/10000)
+  
+#Print Map
+tm_shape(chaco_region)+
+  tm_borders()+
+  tm_text("area", size = 1/2)
+
+```
+
+```{r}
+#lets be secure that the CRS is the Right one
+st_crs(fc_2000) <- 32721
+#check how it the Forest Cobert in Paraguay
+tm_shape(fc_2000)+
+  tm_sf(col = "green")
+
+```
+
+```{r}
+#Extrat the forest Cobert only from the Chaco Region
+fc_2000_chaco <- st_intersection(chaco_region,fc_2000)
+
+tm_shape(fc_2000_chaco)+
+  tm_fill(col = "green")
+```
+
+```{r}
+#create the erase function
+st_erase = function(x, y) st_difference(x, st_union(st_combine(y)))
+
+#create the Not Forest covert by erase the the Chaco Region with the Forest Covert
+nf_2000_chaco <- st_erase(chaco_region, fc_2000_chaco)
+
+tm_shape(nf_2000_chaco)+
+  tm_fill(col = "red")
+```
+
+``
+```{r}
+#This chunk is generate some problems... can we check it
+
+#transform  Forest Covert multi-polygon to polygon
+fc_2000_chaco_pol <- st_cast(fc_2000_chaco, "POLYGON")|>
+  mutate(class = "forest")
+ 
+
+#transform Not Forest multi-polygon to polygon
+nf_2000_chaco_pol <- st_cast(nf_2000_chaco, "POLYGON")|>
+  mutate(class = "not forest")
+
+#create the Land Use 
+lu_2000 <- st_union(nf_2000_chaco_pol, fc_2000_chaco_pol, by_feature = TRUE, is_coverage = TRUE)
+
+tm_shape(lu_2000)+
+  tm_sf(col = class)
+
+```

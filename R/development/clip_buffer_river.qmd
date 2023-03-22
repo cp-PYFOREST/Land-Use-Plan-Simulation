@@ -1,0 +1,63 @@
+# Libraries
+
+```{r}
+#| include: false
+library(sf)
+library(tmap)
+library(tidyverse)
+library(here)
+library(units)
+library(knitr)
+```
+
+# River File
+```{r}
+hydro <- st_read(here('/capstone/pyforest/data/roads_hydrology/ly_hid2.shp'))
+```
+
+# Study boundary file
+
+```{r}
+study <- st_read(here('/capstone/pyforest/data/study_boundary/study_boundary.shp'))
+```
+
+# Create buffer around all rivers
+```{r}
+river <- st_buffer(hydro, dist = 50) 
+```
+
+
+# Subset river
+
+```{r}
+rivers <- st_intersection(river, study)
+
+```
+
+```{r}
+tm_shape(rivers) +
+  tm_sf()
+```
+
+
+```{r}
+#st_write(rivers, '/Users/romero61/../../capstone/pyforest/data/river_buffer/rivers.shp')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

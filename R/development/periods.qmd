@@ -1,0 +1,145 @@
+---
+title: "property stats"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+---
+
+
+```{r}
+#| include: false
+library(sf)
+library(tmap)
+library(tidyverse)
+library(here)
+library(knitr)
+library(mapview)
+library(units)
+library(flextable)
+```
+
+```{r}
+#| include: false
+#| warning: false
+#forestry_registry
+source(knitr::purl(here("R",'src', "boundary_registry_data.qmd")))
+# active_inactive
+active_inactive <- readRDS('/capstone/pyforest/data/active_inactive/active_inactive.rds') 
+df_0005 <- st_read('/capstone/pyforest/data/forest_loss/00_05_lossforest.shp')
+dist_filadelphia <- st_read('/capstone/pyforest/data/dist_filadelphia/dist_filadelphia.shp')
+
+```
+
+```{r}
+
+#active_area_m2 <- active_inactive 
+#|> mutate(area = st_area(active_inactive), .before = geometry)
+
+
+# 
+active_0005 <-  active_inactive |>
+  filter( year_inactive >= 2000 & year_inactive < 2005 )
+
+
+cat_0005 <- forestry_registry |> 
+  filter(put_id %in% active_0005$put_id)
+
+cat_0005_fila <- st_intersection(cat_0005, dist_filadelphia) 
+#|> st_join(active_0005, suffix = 'put_id')
+
+
+
+cat_df <- st_intersection(df_0005, cat_0005_fila)
+#cat_df2 <- st_intersection(cat_0005_fila, df_0005)
+
+properties_df <- active_0005 |>
+  filter(put_id %in% unique(cat_df$put_id))
+
+properties_df_area <- properties_df |>
+  mutate(prop_area = st_area(properties_df)) |>
+  select(put_id, prop_area) |>
+  drop_units() |>
+  st_drop_geometry()
+
+
+area_by_group <- cat_df %>% 
+  mutate(area_group = st_area(.)) |>
+  select(put_id, grupo, area_group) |>
+  drop_units() |>
+  st_drop_geometry()
+         
+
+  
+```
+
+
+```{r}
+
+
+tmap_mode('plot')
+tm_shape(dist_filadelphia) +
+  tm_borders() +
+tm_shape(df_0005) +
+  tm_fill(col = 'red') +
+  tm_shape(cat_0005_fila) +
+  tm_borders(col = 'dodgerblue') 
+
+  
+  tm_shape(cat_0005_fila) +
+  tm_sf(col = 'blue') +
+tm_shape(cat_df) +
+  tm_sf(col = 'red') 
+
+  
+   tm_shape(cat_0005_fila) +
+  tm_sf(col = 'blue') +
+tm_shape(cat_df2) +
+  tm_sf(col = 'red') 
+```
+
+
+
+```{r}
+tmap_mode('plot')
+tm_shape(dist_filadelphia) +
+  tm_borders()+
+      tm_shape(active_inactive) +
+  tm_polygons(col = 'forestgreen')+
+tm_shape(df_0005) +
+  tm_fill(col = 'red') +
+  tm_shape(cat_0005_fila) +
+  tm_borders(col = 'dodgerblue')
+```
+
+```{r}
+
+
+
+property_stats <- left_join(area_by_group, properties_df_area, by = 'put_id') |>
+  mutate(percentage = round((area_group/ prop_area) * 100,2))
+
+ft1 <- flextable(property_stats)
+ theme_zebra(ft1)
+ 
+
+ 
+ ggplot(property_stats, aes(x = grupo, y = percentage, fill = grupo)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  scale_fill_brewer(palette = "Set2") +
+  xlab("Group") + ylab("Percentage") +
+  ggtitle("Percentage by Group and Type") +
+  theme_minimal()
+ 
+ 
+ ggplot(property_stats, aes(x = "", y = percentage, fill = grupo)) +
+  geom_bar(width = 1, stat = "identity", color="white") +
+  coord_polar(theta = "y") +
+  scale_fill_brewer(palette = "Set2") +
+  ggtitle("Percentage by Group and Type") +
+  theme_void()
+ 
+ 
+
+```
