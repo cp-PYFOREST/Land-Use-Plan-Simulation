@@ -18,11 +18,14 @@ source(knitr::purl(here('src', "lup_simulator.qmd")))
 
 
 ```{r}
+#| include: false
+
 limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
 
-limit_lu <- limit_lu[281:nrow(limit_lu), ]
+limit_lu <- limit_lu[19,]
 
-hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/rivers.shp')
+hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/river_buffer.gpkg')
+
 
 ```
 

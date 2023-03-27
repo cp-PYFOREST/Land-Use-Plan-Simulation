@@ -1,12 +1,4 @@
----
-title: "functions"
-format: html
-editor: visual
----
 
-# Select Property
-
-```{r input data}
 select_property <- function(property_cat) {
   #property_cat <- as.character(property_cat)
   #property_cat <- paste0('0', property_cat)
@@ -22,11 +14,9 @@ select_property <- function(property_cat) {
 }
     
   
-```
 
-# Input of Paddock and Hedgerow Dimensions
 
-```{r}
+
 
 
 # 
@@ -58,11 +48,9 @@ property_dimensions <- function(desired_area = 999000 ,
 
 }
 
-```
 
-# Create Grid & Rotate
 
-```{r}
+
 grid_rotate <-
   function(boundary_property = property_boundary,
            x_y = pad_hedg_dim) {
@@ -101,7 +89,7 @@ grid_rotate <-
     grd <-
       sf::st_make_grid(tran(inpoly, -rotang, center),
                        cellsize = c(x_y[[1]], x_y[[2]]),
-                       n = 50)
+                       n = 150)
     
     
     
@@ -115,11 +103,9 @@ grid_rotate <-
     return(test_rot)
   }
 
-```
 
-# Riparian Corridor
 
-```{r}
+
 
 riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) {
   # Using riparian corridor cut the property fragments
@@ -130,11 +116,9 @@ riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) 
       st_difference(prop_gr, rip_corr) |> st_cast(to = 'MULTIPOLYGON') |> st_cast(to = 'POLYGON')
   }
 }
-```
 
-# Forest Reserve
 
-```{r}
+
 
 reserve <- function(grid = property_fragment,boundary_property = property_boundary ) {
   grid_boundary_sf <- st_as_sf(grid)
@@ -162,11 +146,9 @@ reserve <- function(grid = property_fragment,boundary_property = property_bounda
 
 
 
-```
 
-# Remaining Area w/o Forest Reserve
 
-```{r}
+
 no_reserve_area <- function(grid_property = property_fragment,
                             fr_union = forest_reserve){
   #remaining property without forest reserve
@@ -176,11 +158,9 @@ no_reserve_area <- function(grid_property = property_fragment,
   
 
 }
-```
 
-# River Check
 
-```{r}
+
 riparian_buffer <-
   function(boundary_property = property_boundary,
            hydrology = hydro) {
@@ -195,11 +175,9 @@ riparian_buffer <-
       return(NULL)
     }
   }
-```
 
-# Divide Area into paddocks and hedgerows
 
-```{r}
+
 make_hedges <- function(fragment = property_remaining) {
   # Make remaining property without forest into a a solid polygon and regrid. Regridding creates individual cells with geometry that can be buffered for hedgerows
 
@@ -218,9 +196,9 @@ make_hedges <- function(fragment = property_remaining) {
   
   return(hedge)
 }    
-```
 
-```{r}
+
+
 
 make_paddocks <- function(frag = property_remaining, rows = hedgerows) {
     # pad will give the combined paddocks as one polygon to so st_area only returns one value
@@ -234,10 +212,8 @@ make_paddocks <- function(frag = property_remaining, rows = hedgerows) {
 # To get individual paddocks regrid area that has removed forest and take difference with hedgerows
     
   }
-```
 
-# `sf` st_erase
 
-```{r}
+
 st_erase = function(x, y) st_difference(x, st_union(st_combine(y)))
-```
+

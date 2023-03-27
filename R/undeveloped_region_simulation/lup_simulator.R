@@ -89,7 +89,7 @@ grid_rotate <-
     grd <-
       sf::st_make_grid(tran(inpoly, -rotang, center),
                        cellsize = c(x_y[[1]], x_y[[2]]),
-                       n = 150)
+                       n = 50)
     
     
     
@@ -113,15 +113,14 @@ riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) 
     return(prop_gr)
   } else{
     prop_frag_rip <-
-      st_difference(prop_gr, rip_corr)
-    return(prop_frag_rip)
+      st_difference(prop_gr, rip_corr) |> st_cast(to = 'MULTIPOLYGON') |> st_cast(to = 'POLYGON')
   }
 }
 
 
 
 
-reserve <- function(grid = property_fragment) {
+reserve <- function(grid = property_fragment,boundary_property = property_boundary ) {
   grid_boundary_sf <- st_as_sf(grid)
   
   cell_areas <- grid_boundary_sf |>
@@ -134,7 +133,7 @@ reserve <- function(grid = property_fragment) {
       head(n)
 
     area_check <-
-      sum((st_area(forest) / sum(st_area(cell_areas))) * 100 )
+      sum((st_area(forest) / sum(st_area(boundary_property))) * 100 )
 
     if (area_check >= set_units(25,1)) {
       break

@@ -14,7 +14,7 @@ library(knitr)
 
 ```{r}
 #| include: false
-source(knitr::purl(here("R",'development', "separate_functions.qmd")))
+source(knitr::purl(here('src', "lup_simulator.qmd")))
 ```
 
 # Input Data
@@ -22,34 +22,12 @@ source(knitr::purl(here("R",'development', "separate_functions.qmd")))
 ```{r}
 #| include: false
 
+limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
 
+limit_lu <- limit_lu[1654:1654,]
 
-#limit_lu <- st_read('/capstone/pyforest/data/Permited_Land_Use/limite_put.shp')
+hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/river_buffer.gpkg')
 
-
-
-#|>  st_make_valid()|> st_transform("EPSG:32721")
-
-# riverline <- st_read('/capstone/pyforest/data/river_05242.shp')) |>
-#   st_make_valid() |>
-#   st_transform("EPSG:32721")
-
-limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp') |>
-  head(n = 1)
-
-hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/rivers.shp')
-#hydro <- st_read(here('/capstone/pyforest/data/roads_hydrology/ly_hid2.shp'))  
-
-
-#|> st_make_valid() |> st_transform("EPSG:32721")
-
-
-#prop_limit <- st_read(here('/capstone/pyforest/Sample Data/catastro_forestal_3ej.shp')) 
-
-
-#%>%  st_make_valid() |>  st_transform("EPSG:32721")
-# prop_limit_05242 <- prop_limit %>% 
-#   filter(cat == "05242")
 ```
 
 
@@ -57,7 +35,7 @@ hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/rive
 
 ```{r}
 
-property_boundary <- select_property(3)
+property_boundary <- select_property(1654)
 plot(property_boundary)
 
 ```
@@ -94,7 +72,7 @@ x <- sqrt((999999 * (1/3))) + (50)
 ```{r}
 pad_hedg_dim <- property_dimensions(desired_area = 999999 ,
                                 hedgerow_width = 100,
-                                width_paddock = 4,
+                                width_paddock = 2,
                                 height_paddock = 3)
 
 ```
@@ -104,25 +82,24 @@ pad_hedg_dim <- property_dimensions(desired_area = 999999 ,
 ```{r}
 property_grid <- grid_rotate()
 plot(property_grid)
-st_area(property_grid)
 ```
 
 ```{r}
 # cut grid with river
 property_fragment <- riparian_cut()
 tmap_mode('view')
-#tmap_options(check.and.fix = TRUE)
+tmap_options(check.and.fix = TRUE)
 tm_shape(property_grid) +
   tm_sf(col = 'forestgreen') +
-tm_shape(riparian_corridor) +
-  tm_borders(col = 'red') +
   tm_shape(property_fragment) +
-  tm_sf(col = 'beige')
-plot(property_fragment)
+  tm_polygons(col = 'beige')+
+  tm_shape(riparian_corridor) +
+  tm_borders(col = 'red')
+plot(property_fragment, col = 'green')
 ```
 
 ```{r}
-#build if statement where n has to be irregular after start collecting by number
+#build if statement where n has to be irregular then start collecting by number
 #
 #
 
@@ -216,7 +193,7 @@ repeat {
 
 
 ```{r}
- rid_boundary_sf <- st_as_sf(property_grid)
+ rid_boundary_sf <- st_as_sf(property_fragment)
   
   ell_areas <- rid_boundary_sf |>
     mutate(cell_area = st_area(rid_boundary_sf))
@@ -239,11 +216,11 @@ plot(orest)
 
 
 ```{r}
-forest_reserve <- reserve()
+forest_reserve <- reserve(property_fragment,property_boundary)
   tm_shape(forest_reserve) +
   tm_sf(col = 'blue')
 
-st_area(forest_reserve)
+sum((st_area(forest_reserve)) / st_area(property_boundary)) * 100 
 plot(forest_reserve)
 ```
 
@@ -260,9 +237,15 @@ plot(property_remaining)
 
 
 ```{r}
-property_remaining <- no_reserve_area()
+property_remaining <-
+  no_reserve_area(grid_property = property_fragment,
+                  fr_union = forest_reserve)
 plot(property_remaining)
-st_area(property_remaining)
+
+tm_shape(property_remaining) +
+  tm_sf()+
+  tm_shape(forest_reserve) +
+  tm_sf(col = 'green')
 ```
 
 # Hedgerows
@@ -332,7 +315,7 @@ hedgerows <- make_hedges()
 hedge <- st_erase(hedgerows,property_boundary) 
 hedges <- st_difference(hedgerows, hedge)
 cut_reserve <- st_intersection(forest_reserve,hedges  )
-hedges <- st_difference(hedges, cut_reserve)
+hedges <- st_difference(hedges, cut_reserve) |> st_simplify(dTolerance = 10)
   
 plot(hedges)
 plot(cut_reserve, col = 'green')
@@ -351,10 +334,11 @@ st_area(paddocks)
 
 ```{r}
 if(is.null(riparian_corridor) == FALSE) {
-  riparian_area <- round(st_area(riparian_corridor),2)
+  riparian_area <- sum(round(st_area(riparian_corridor),2))
   riparian_area_per <-
-    (st_area(riparian_corridor) / st_area(property_boundary)) * 100
-  final_hedgerow <- st_difference(hedges, riparian_corridor)
+    sum((st_area(riparian_corridor)) / st_area(property_boundary)) * 100 
+  final_hedgerow <- st_difference(hedges, riparian_corridor) |> st_sf() |>
+   st_collection_extract(type = 'POLYGON')
   
 } else{
   riparian_area <- NA
@@ -368,7 +352,13 @@ if(is.null(riparian_corridor) == FALSE) {
 
 ```{r}
 
-tmap_mode('plot')
+forest_reserve <- st_as_sf(forest_reserve)
+final_hedgerow <- st_as_sf(final_hedgerow) 
+paddocks <- st_as_sf(paddocks)
+
+
+tmap_mode('view')
+tmap_options(check.and.fix = TRUE)
 tm_shape(property_boundary) +
   tm_sf('red') +
 tm_shape(forest_reserve) +
@@ -389,7 +379,7 @@ tm_shape(paddocks) +
   tm_sf('beige')
   
 tm_shape(final_hedgerow) +
-  tm_polygons(col = 'green')  
+  tm_sf(col = 'green')  
   
 tm_shape(forest_reserve) +
   tm_polygons(col = 'forestgreen')
@@ -402,6 +392,7 @@ tm_shape(property_boundary) +
 
 ```
 
+
 # Final Areas
 
 ```{r}
@@ -409,26 +400,27 @@ statistics <- tibble(
   id = property_boundary$cat,
   property_area = st_area(property_boundary) |> drop_units(),
   property_units = 'm^2',
-  fr_area = st_area(forest_reserve) |> drop_units(),
+  fr_area = sum(st_area(forest_reserve)) |> drop_units(),
   fr_units = 'm^2',
-  fr_per = round((st_area(forest_reserve) / st_area(property_boundary)) * 100,2) |> drop_units()
+  fr_per = round((sum((st_area(forest_reserve)) / st_area(property_boundary))) * 100,2)|> drop_units()
 ,
   paddocks_area = round(sum(st_area(paddocks)),2) |> drop_units(),
   paddocks_units = 'm^2',
   paddocks_per = round(sum(st_area(paddocks)) / st_area(property_boundary)* 100 ,2) |>  drop_units(),
-  hedgerow_area = st_area(final_hedgerow) |>  drop_units(),
+  hedgerow_area = sum(st_area(final_hedgerow)) |>  drop_units(),
   hedgerow_units = 'm^2',
   hedgerow_per = round((sum(st_area(final_hedgerow)) / st_area(property_boundary)) * 100,2) |> drop_units(),
-  riparian_area = riparian_area |> drop_units(),
+  riparian_area = riparian_area ,
   riparian_units = 'm^2',
-  riparian_per = riparian_area_per |> drop_units()
+  riparian_per = riparian_area_per
     )
-c(statistics) 
+statistics
 #saveRDS(statistics, "statistics.rds")
 ```
 
 ```{r}
 
 st_area(paddocks)
-c(statistics |> mutate(total_area = sum(fr_per, paddocks_per,hedgerow_per, riparian_per) ))
+statistics |> mutate(total_area = sum(fr_per, paddocks_per,hedgerow_per, riparian_per))
+
 ```

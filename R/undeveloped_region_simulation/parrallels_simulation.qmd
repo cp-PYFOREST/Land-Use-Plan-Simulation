@@ -1,0 +1,831 @@
+```{r}
+library(sf)
+library(tidyverse)
+library(here)
+library(units)
+library(knitr)
+library(tictoc)
+library(flextable)
+library(parallel)
+library(purrr)
+library(foreach)
+library(doParallel)
+library(furrr)
+library(beepr)
+library(gt)
+```
+
+
+
+```{r}
+#source(knitr::purl(here("src", "boundary_registry_data.qmd")))
+source(knitr::purl(here('src', "lup_simulator.qmd")))
+
+```
+
+
+```{r}
+limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
+
+#to read in rework if not loaded
+# limit_lu <- st_read("/Users/romero61/../../capstone/pyforest/data/rework/rwk_over28.gpkg")
+
+hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/river_buffer.gpkg')
+
+```
+
+# Parallel Functions
+
+```{r}
+# create a vector of unique combinations of width_paddock # Function to create unique combinations of width_paddock and height_paddock
+create_paddock_dims <- function() {
+  expand_grid(width_paddock = 1:4, height_paddock = 1:4) %>%
+    subset(width_paddock != height_paddock | width_paddock == 1)
+}
+```
+
+
+```{r}
+generate_statistics <-
+  function(property_boundary,
+           width_paddock,
+           height_paddock,
+           forest_reserve,
+           paddocks,
+           final_hedgerow,
+           riparian_area,
+           riparian_area_per) {
+     # print("Inside generate_statistics")
+    # 
+    # print("Checking property_boundary")
+    # print(property_boundary)
+    # print("Checking forest_reserve")
+    # print(forest_reserve)
+    # print("Checking paddocks")
+    # print(paddocks)
+    # print("Checking final_hedgerow")
+    # print(final_hedgerow)
+    # print('Checking property')
+    # print(property_boundary$cat)
+    # print("Checking riparians")
+    # print(riparian_area)
+    # print(riparian_area_per)
+
+    statistics <- tibble(
+      cat = property_boundary$cat,
+      ratio_xy = paste(width_paddock, "/", height_paddock),
+      property_area = st_area(property_boundary) |> drop_units(),
+      property_units = "m^2",
+      
+      fr_area = sum(st_area(forest_reserve)) |> drop_units(),
+      fr_units = "m^2",
+      fr_per = round((sum((st_area(forest_reserve)) / st_area(property_boundary))) * 100,2) |> drop_units(),
+      
+      paddocks_area = round(sum(st_area(paddocks)),2) |> drop_units(),
+      paddocks_units = "m^2",
+      paddocks_per = round(sum(st_area(paddocks)) / st_area(property_boundary)* 100 ,2) |>  drop_units(),
+      
+      hedgerow_area = ifelse(is.null(final_hedgerow), NA, st_area(final_hedgerow)),
+      hedgerow_per =  round((sum(st_area(final_hedgerow)) / st_area(property_boundary)) * 100,2) |> drop_units(),
+      
+      riparian_area = riparian_area ,
+      riparian_units = 'm^2',
+      riparian_per = riparian_area_per
+    )
+  #   log_message <- paste("stats:", nrow(statistics), "\n")
+  # cat(log_message, file = "log.txt", append = TRUE)
+    return(statistics)
+  }
+```
+
+
+
+
+
+```{r}
+#| include: false
+
+# Function to process a single property and paddock dimension
+process_property <- function(property_id, width_paddock, height_paddock) {
+   #print("Starting process_property function") # Add this line
+  # Your code for processing a single property and paddock dimension
+  # Here you should use the provided property_id, width_paddock, and height_paddock
+  # instead of the values from the loops.
+  # 
+  # print(paste(
+  #   'id',
+  #   property_id,
+  #   'width_paddock',
+  #   width_paddock,
+  #   "Height",
+  #   height_paddock
+  # ))
+  
+  results_df <- data.frame()
+    tryCatch({
+      #print("Inside tryCatch block")
+
+
+  property_id <- as.integer(property_id)
+  # Select Property
+  #print("Selecting property")
+  property_boundary <- select_property(property_id)
+  
+  # Riparian Corridor check
+  #print("Checking riparian corridor")
+  riparian_corridor <- riparian_buffer(boundary_property = property_boundary,
+           hydrology = hydro)
+  
+
+  # Property dimensions
+ #print("Calculating property dimensions")
+  pad_hedg_dim <- property_dimensions(
+    desired_area = 600000,
+    hedgerow_width = 100,
+    width_paddock = width_paddock,
+    height_paddock = height_paddock)
+  
+  # Create Grid , Rotate, Cut With Property
+ #print("Creating grid, rotating, and cutting with property")
+  property_grid <- grid_rotate(property_boundary, pad_hedg_dim)
+  
+  # Cut Grid w/ River
+  #print("Cutting grid with river")
+  property_fragment <- riparian_cut(riparian_corridor, property_grid)
+
+  # Create Forest Reserve ≥ 25% 
+  #print("Calculating forest reserve")
+  forest_reserve <- reserve(property_fragment,property_boundary)
+  
+  # Property w/o reserve area
+  # 
+  #print("Calculating remaining area without forest reserve")
+  property_remaining <- no_reserve_area(grid_property = property_fragment,
+                  fr_union = forest_reserve)
+
+  # Hedgerows
+  #print("Dividing area into paddocks and hedgerows")
+  hedgerows <- make_hedges(property_remaining)
+  
+  hedge <- st_erase(hedgerows, property_boundary)
+  hedges <- st_difference(hedgerows, hedge)
+  cut_reserve <- st_intersection(forest_reserve, hedges)
+  hedges <- st_difference(hedges, cut_reserve) |> st_simplify(dTolerance = 10)
+    
+  #print("After processing hedgerows")
+  
+  # Paddocks
+  paddocks <- make_paddocks(property_remaining, hedgerows)
+ 
+  #print("After processing paddocks")
+  # If there is a corridor cut edges
+  if(is.null(riparian_corridor) == FALSE) {
+  riparian_area <- sum(round(st_area(riparian_corridor),2))
+  riparian_area_per <-
+    sum((st_area(riparian_corridor)) / st_area(property_boundary)) * 100
+     final_hedgerow <- st_difference(hedges, riparian_corridor) |> st_sf() |>
+   st_collection_extract(type = 'POLYGON')
+    
+  } else{
+    riparian_area <- NA
+    riparian_area_per <- NA
+    final_hedgerow <- hedges
+  }
+  
+  
+  
+# print("Calculating final statistics")
+#    log_message <- paste("Processing property_id:", property_id, "width_paddock:", width_paddock, "height_paddock:", height_paddock, "\n")
+# cat(log_message, file = "log.txt", append = TRUE)
+# print(log_message)
+
+  
+  # Final Areas
+   statistics <-
+     generate_statistics(
+       property_boundary,
+       width_paddock,
+       height_paddock,
+       forest_reserve,
+       paddocks,
+       final_hedgerow,
+       riparian_area,
+       riparian_area_per
+     )
+   # print('Check return of statistics')
+   # print(paste("Number of rows in statistics:", nrow(statistics)))
+
+  results_df <- bind_rows(results_df,statistics)
+
+  #print("Done with process_property function")
+  },
+  
+   error = function(e) {
+     error_tibble <- tibble(
+       cat = paste(property_id,width_paddock, height_paddock),
+       error = as.character(e)
+     )
+   results_df <- bind_rows(results_df, error_tibble)
+   })
+  #print("After tryCatch block")
+  #print(paste("Returning result for property_id:", property_id, ", width_paddock:", width_paddock, ", height_paddock:", height_paddock))
+  #print(paste("Number of rows in statistics:", nrow(results_df$statistics)))
+  # print(paste("Number of rows in results_df:", nrow(results_df)))
+  
+
+  return(results_df)
+  }
+  
+
+```
+
+# Function for parLapply and foreach
+
+```{r}
+# Function to process a single property and all paddock dimensions
+process_all_paddock_dims <- function(property_id, paddock_dims) {
+  results <- data.frame()
+  print(paste("Processing property_id:", property_id))
+  for (i in seq_along(paddock_dims$width_paddock)){
+    print(paste('iteration:', i, 'property:', property_id))
+    w <- paddock_dims$width_paddock[i]
+    h <- paddock_dims$height_paddock[i]
+    width_paddock = paddock_dims$width_paddock[i]
+    height_paddock = paddock_dims$height_paddock[i]
+    
+    result <- process_property(property_id, w, h)
+    #print("Result from process_property:") # Add this line
+   # print(result) # Add this line
+    results <- bind_rows(results, result)
+    
+    #print(paste("Processing property_id:", property_id))
+   # print(paste("Result for width:", w, "height:", h))
+   # print(result)
+   # print("Cumulative results:") # Add this line
+    print(results)
+
+  }
+
+  results
+}
+```
+
+
+
+```{r}
+
+
+# Create a dataframe of unique paddock dimensions
+paddock_dims <- create_paddock_dims()
+
+# Number of cores to use for parallel processing
+n_cores <- 13
+```
+
+
+# parallel parLapply()
+
+```{r}
+# Function to process all properties and all paddock dimensions in parallel
+process_all_properties_parallel <-
+  function(limit_lu, paddock_dims, n_cores) {
+
+
+    cl <- makeCluster(n_cores)
+
+
+    # Load required packages on the cluster workers
+    clusterEvalQ(cl, {
+      library(tidyverse)
+      library(sf)
+      library(units)
+    })
+
+    clusterExport(
+      cl,
+      c(
+        "limit_lu",
+        "hydro",
+        "paddock_dims",
+        "process_all_paddock_dims",
+        "process_property",
+        "generate_statistics"
+      )
+    )
+    
+    print(paste("Number of properties:", length(limit_lu$cat)))
+    print(paste("Number of paddock dimensions:", nrow(paddock_dims)))
+
+
+    # all_property_results <- lapply(limit_lu$cat, function(x) process_all_paddock_dims(x, paddock_dims))
+
+
+
+    all_property_results <- parLapply(cl, limit_lu$cat, function(property_id) {
+    cat("Processing property ID:", property_id, "\n")
+    result <- process_all_paddock_dims(property_id, paddock_dims = paddock_dims)
+    cat("Finished processing property ID:", property_id, "\n")
+    return(result)
+
+  })
+
+    print(paste(
+      "Length of all_property_results:",
+      length(all_property_results)
+    ))
+    return(all_property_results)
+    stopCluster(cl)
+    }
+
+
+```
+
+
+
+# For loop version
+
+```{r}
+#Function to process all properties and all paddock dimensions in parallel
+
+
+process_all_properties_parallel <-
+  function(limit_lu, paddock_dims, n_cores) {
+
+ #all_property_results <- data.frame
+#   # Replace parallel loop with a simple loop
+  for (property_id in limit_lu$cat) {
+    property_result <- process_all_paddock_dims(property_id, paddock_dims = paddock_dims)
+
+    all_property_results <- bind_rows(all_property_results, property_result)
+  }
+
+    print(paste(
+      "Length of all_property_results:",
+      length(all_property_results)
+      
+    ))
+    all_property_results}
+  
+```
+
+
+
+# foreach doParallel
+```{r}
+
+process_all_properties_parallel <-
+  function(limit_lu, paddock_dims, n_cores) {
+
+#Create a parallel cluster
+cl <- makeCluster(n_cores)
+registerDoParallel(cl)
+
+  # Load required packages on the cluster workers
+  clusterEvalQ(cl, {
+    library(tidyverse)
+    library(sf)
+    library(units)
+  })
+
+  clusterExport(
+    cl,
+    c(
+      "limit_lu",
+      "hydro",
+      "paddock_dims",
+      "process_all_paddock_dims",
+      "process_property",
+      "generate_statistics"
+    )
+  )
+ all_property_results <-
+  foreach(property_id = limit_lu$cat, .combine = "rbind", .packages = c("tidyverse", "sf", "units")) %dopar% {
+    property_result <- process_all_paddock_dims(property_id, paddock_dims = paddock_dims)
+    property_result
+  }
+
+
+
+    print(paste(
+      "Length of all_property_results:",
+      length(all_property_results)
+      
+    ))
+    all_property_results
+stopCluster(cl)}
+
+```
+
+
+
+
+
+
+# Function for purrr/furrr
+
+```{r}
+process_property_nested <- function(property_id, width_paddock, height_paddock) {
+  result <- process_property(property_id, width_paddock, height_paddock)
+  return(result)
+}
+
+
+
+```
+
+
+# purrr
+
+```{r}
+tic()
+# Make sure to register the number of cores you want to use for parallel processing
+# In this example, I am using 4 cores
+
+# Create a list of property ids
+property_ids <- unique(limit_lu$cat)
+
+# Create paddock dimensions
+paddock_dims <- create_paddock_dims()
+
+# Run the process_property function for each property id and paddock dimension
+results <- map_dfr(property_ids, function(property_id) {
+  pmap_dfr(list(
+    width_paddock = paddock_dims$width_paddock,
+    height_paddock = paddock_dims$height_paddock
+  ), function(width_paddock, height_paddock) {
+    process_property_nested(property_id, width_paddock, height_paddock)
+  })
+})
+
+# Combine the results
+results_df <- bind_rows(results)
+toc()
+```
+
+
+# furrr
+```{r}
+#| include: false
+#| warning: false
+tic()
+# Make sure to register the number of cores you want to use for parallel processing
+plan(multisession, workers = 19)
+
+# Create a list of property ids
+property_ids <- unique(limit_lu$cat)
+
+# Create paddock dimensions
+paddock_dims <- create_paddock_dims()
+
+# Run the process_property function for each property id and paddock dimension
+results <- future_map_dfr(property_ids, function(property_id) {
+  future_pmap_dfr(list(
+    width_paddock = paddock_dims$width_paddock,
+    height_paddock = paddock_dims$height_paddock
+  ), function(width_paddock, height_paddock) {
+    process_property_nested(property_id, width_paddock, height_paddock)
+  })
+})
+
+# Combine the results
+results_df <- bind_rows(results)
+toc()
+```
+
+
+
+     
+19 properties 1778.145 sec elapsed purrr
+19 properties 209.476  sec elapsed furrr
+5608properties 21535.431  sec elapsed furrr 
+5608 properties 22472.561 sec elapsed furrr
+797 properies 3209.14 sec elapsed
+
+
+# RUN doParallel  & foreach (run  correct process_all_properties_parallel to switch)
+
+```{r}
+# Run the process for all properties and paddock dimensions in parallel
+tic()
+results <- process_all_properties_parallel(limit_lu, paddock_dims, n_cores)
+toc()
+```
+
+# Example to workshop bugs
+```{r}
+# Call the function with some example data
+example_width_paddock <- 1
+example_height_paddock <- 1
+```
+
+
+```{r}
+example_property_id <- limit_lu$cat[1]
+
+```
+# TEST doParallel  & foreach (run  correct process_all_properties_parallel to switch)
+
+
+```{r}
+property_results <- process_all_paddock_dims(example_property_id, paddock_dims)
+```
+
+
+```{r}
+test_results <- process_property(example_property_id, example_width_paddock, example_height_paddock)
+print(results)
+```
+
+
+
+# Test purrr
+```{r}
+test_result <- process_property(example_property_id, example_width_paddock, example_height_paddock)
+
+```
+
+
+
+ 
+ For after finding best ratio
+ # Add your logic to store or return the results
+  results_df <- list(
+    property_boundary = property_boundary,
+    riparian_corridor = riparian_corridor,
+    pad_hedg_dim = pad_hedg_dim,
+    property_grid = property_grid,
+    property_fragment = property_fragment,
+    forest_reserve = forest_reserve,
+    property_remaining = property_remaining,
+    hedgerows = hedgerows,
+    paddocks = paddocks
+  )
+
+# Saving results to data folder
+```{r}
+#
+# results_df5608 25%
+# result_df5608_increase 50%
+#saveRDS(results, '~/../../capstone/pyforest/data/results_5608/results5608.rds')
+#saveRDS(results, '~/../../capstone/pyforest/data/results_5608/results5608_increase.rds')
+
+```
+
+# Reload data 
+```{r}
+# load in results as running script again will overwrite results variable
+results5608 <- readRDS("/Users/romero61/../../capstone/pyforest/data/results_5608/results5608.rds")
+
+
+result5608_increase <- readRDS("/Users/romero61/../../capstone/pyforest/data/results_5608/results5608_increase.rds")
+```
+
+# Optimal ratios and paddocks sizes
+
+```{r}
+# Arrange the data by property_id, highest paddocks_area, and fr_area, and separate ratio_xy into width_paddock and height_paddock.
+# Resulting dataset is optimal ratios 
+optimal <- results5608 %>%
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)
+
+
+# Optimal needs to be reworked into smaller paddocks subset properties with greater than 28% forest reserve
+
+optimal_28 <- optimal |> 
+  filter(fr_per >= 28) # on review this should have been just greater than but leaving for reproducibility
+
+# subset limit_lu to properties that need to be reworked into smaller paddocks. First rework paddock area reduced to 990000 down from 999999
+# 
+#record of which properties to be reworked
+rework_over28 <- limit_lu |> 
+  filter(cat %in%  optimal_28$cat)
+
+limit_lu <- rework_over28 #run 797 properties
+```
+
+
+```{r}
+# save new reworked dataset
+# 
+#optimalrwk_result <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28.rds')
+optimalrwk_result <- readRDS('~/../../capstone/pyforest/data/rework/results_rwk28.rds')
+optimal_rwk <- optimalrwk_result %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 797 properties
+
+# Second Subset paddocks = 980000
+optimal_28_2 <- optimal_rwk |> 
+  filter(fr_per > 28)
+
+#record of which properties to be reworked
+rework_over28_2 <- limit_lu |> 
+  filter(cat %in%  optimal_28_2$cat)
+
+limit_lu <- rework_over28_2 #run 586 properties
+```
+
+
+```{r}
+# save second new reworked dataset
+# 
+#optimalrwk_result2 <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28_2.rds')
+optimalrwk_result2 <- readRDS( '~/../../capstone/pyforest/data/rework/results_rwk28_2.rds')
+optimal_rwk2 <- optimalrwk_result2 %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 596 properties
+
+# Third Subset 
+optimal_28_3 <- optimal_rwk2 |> 
+  filter(fr_per > 28) |> 
+  select(cat, fr_per, paddocks_area) |> 
+  arrange( desc(fr_per))
+
+theme_zebra(flextable(optimal_28_3))
+
+#based on table using 970000 wont resolve issue so jumping to 950000
+optimal_28_3 <- optimal_rwk2 |> 
+  filter(fr_per > 28) 
+
+#record of which properties to be reworked
+rework_over28_3 <- limit_lu |> 
+  filter(cat %in%  optimal_28_3$cat)
+
+limit_lu <- rework_over28_3 # run 433 properties
+```
+
+
+```{r}
+# save third new reworked dataset
+# 
+#optimalrwk_result3 <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28_3.rds')
+optimalrwk_result3 <- readRDS( '~/../../capstone/pyforest/data/rework/results_rwk28_3.rds')
+optimal_rwk3 <- optimalrwk_result3 %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 433 properties
+
+
+# FOURTH Subset 
+optimal_28_4 <- optimal_rwk3 |> 
+  filter(fr_per > 28) |> 
+  select(cat, fr_per, paddocks_area) |> 
+  arrange( desc(fr_per))
+
+theme_zebra(flextable(optimal_28_4)) # STILL AN ISSUE 
+
+# Lets doa visual check 
+tm_shape(limit_lu) + 
+  tm_sf()
+
+#Reset to rerun
+optimal_28_4 <- optimal_rwk3 |> 
+  filter(fr_per > 28) 
+
+#record of which properties to be reworked
+rework_over28_4 <- limit_lu |> 
+  filter(cat %in%  optimal_28_4$cat)
+
+limit_lu <- rework_over28_4 # run 208 properties Paddocks = 900000
+```
+
+
+```{r}
+# save fourth new reworked dataset
+# 
+#optimalrwk_result4 <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28_4.rds')
+optimalrwk_result4 <- readRDS( '~/../../capstone/pyforest/data/rework/results_rwk28_4.rds')
+optimal_rwk4 <- optimalrwk_result4 %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 208 properties
+
+# FIFTH Subset 
+optimal_28_5 <- optimal_rwk4 |> 
+  filter(fr_per > 28)
+
+#record of which properties to be reworked
+rework_over28_5 <- limit_lu |> 
+  filter(cat %in%  optimal_28_5$cat)
+
+limit_lu <- rework_over28_5 # run 76 properties Paddocks = 800000
+```
+
+
+```{r}
+# save fifth new reworked dataset
+# 
+#optimalrwk_result5 <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28_5.rds')
+optimalrwk_result5 <- readRDS( '~/../../capstone/pyforest/data/rework/results_rwk28_5.rds')
+optimal_rwk5 <- optimalrwk_result5 %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 76 properties
+
+
+# Sixth Subset 
+optimal_28_6 <- optimal_rwk5 |> 
+  filter(fr_per > 28)
+
+#record of which properties to be reworked
+rework_over28_6 <- limit_lu |> 
+  filter(cat %in%  optimal_28_6$cat)
+
+limit_lu <- rework_over28_6 # run 20 properties Paddocks = 700000
+```
+
+
+```{r}
+# save sixth new reworked dataset
+# 
+#optimalrwk_result6 <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28_6.rds')
+optimalrwk_result6 <- readRDS( '~/../../capstone/pyforest/data/rework/results_rwk28_6.rds')
+optimal_rwk6 <- optimalrwk_result6 %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 20 properties
+
+### STILL FOUR PROPERTIES OVER 28
+### 1] 28.17 31.23 43.93 28.12
+### 
+### itll likely take two more subsets
+### or one big jump down
+
+
+# Seventh Subset 
+optimal_28_7 <- optimal_rwk6 |> 
+  filter(fr_per > 28)
+
+#record of which properties to be reworked
+rework_over28_7 <- limit_lu |> 
+  filter(cat %in%  optimal_28_7$cat)
+
+limit_lu <- rework_over28_7 # run 4 properties Paddocks = 650000
+```
+
+
+```{r}
+# save seventh new reworked dataset
+# 
+#optimalrwk_result7 <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28_7.rds')
+optimalrwk_result7 <- readRDS( '~/../../capstone/pyforest/data/rework/results_rwk28_7.rds')
+optimal_rwk7 <- optimalrwk_result7 %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 4 properties
+
+# last Subset 
+optimal_28_8 <- optimal_rwk7 |> 
+  filter(fr_per > 28)
+
+#record of which properties to be reworked
+rework_over28_8 <- limit_lu |> 
+  filter(cat %in%  optimal_28_8$cat)
+
+limit_lu <- rework_over28_8 # run 1 properties Paddocks = 600000
+```
+
+
+```{r}
+# save last new reworked dataset
+# 
+#optimalrwk_result8 <- results
+#saveRDS(results, '~/../../capstone/pyforest/data/rework/results_rwk28_8.rds')
+optimalrwk_result8 <- readRDS( '~/../../capstone/pyforest/data/rework/results_rwk28_8.rds')
+optimal_rwk8 <- optimalrwk_result8 %>% 
+  group_by(cat) %>%
+  arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
+  slice(1) %>%
+  ungroup() # 4 properties
+```
+
+
+```{r}
+percentages <- results_df |>
+  select(-error_paddocks, -error_hedgerow, -corridor_area, -property_area, -property_units, -fr_area, -paddocks_area, -paddocks_units, - hedgerow_area, -fr_units) |>
+  drop_units() |> 
+  replace_na(replace = list(corridor_per = 0)) |> mutate(sum_percentage = fr_per + paddocks_per + hedgerow_per + corridor_per)
+#saveRDS(statistics, "/Users/romero61/../../capstone/pyforest/data/results_df/statistics.rds")
+theme_apa(flextable(percentages))
+```
+
+

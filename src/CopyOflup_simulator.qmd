@@ -8,18 +8,9 @@ editor: visual
 
 ```{r input data}
 select_property <- function(property_cat) {
-  #property_cat <- as.character(property_cat)
-  #property_cat <- paste0('0', property_cat)
-  
-  
-  if (property_cat %in% limit_lu$cat) {
-    boundary <- limit_lu |>
+   boundary <- limit_lu |>
       filter(cat == property_cat)
-  }else{
-      message('ID not found')
-    return(NULL)
-  }
-}
+   }
     
   
 ```
@@ -28,23 +19,11 @@ select_property <- function(property_cat) {
 
 ```{r}
 
-
-# 
 property_dimensions <- function(desired_area = 999000 ,
                         hedgerow_width = 100,
                         width_paddock = 1,
                         height_paddock = 1) {
-    width_paddock <- as.integer(width_paddock)
-    height_paddock <- as.integer(height_paddock)
-  #Dimensions
-
  
-
-  # Aspect Ratio (from square to rectangle)
-  ratio_x <- c(1,2,3,4)
-  ratio_y <- c(1,2,3,4)
-
-  if(width_paddock %in% ratio_x & height_paddock %in% ratio_y){
   y <- sqrt(desired_area / (ratio_x[width_paddock]/ratio_y[height_paddock])) + (hedgerow_width)
 
   x <- sqrt(desired_area * (ratio_x[width_paddock]/ratio_y[height_paddock])) + (hedgerow_width)
@@ -52,12 +31,8 @@ property_dimensions <- function(desired_area = 999000 ,
   x_y <- tibble(x, y)
 
   return(x_y)
-  }else{
-    print('INVALID RATIO OF WIDTH TO HEIGHT')
-  }
-
+ 
 }
-
 ```
 
 # Create Grid & Rotate
@@ -117,6 +92,25 @@ grid_rotate <-
 
 ```
 
+# River Check
+
+```{r}
+riparian_buffer <-
+  function(boundary_property = property_boundary,
+           hydrology = hydro) {
+ # check if there's is river crossing property and subset
+    if (lengths(st_intersects(boundary_property, hydrology)) > 0) {
+      riparian <- st_intersection(hydrology, boundary_property) |>
+        st_make_valid() 
+  
+      return(riparian)
+      
+    } else{
+      return(NULL)
+    }
+  }
+```
+
 # Riparian Corridor
 
 ```{r}
@@ -127,7 +121,8 @@ riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) 
     return(prop_gr)
   } else{
     prop_frag_rip <-
-      st_difference(prop_gr, rip_corr) |> st_cast(to = 'MULTIPOLYGON') |> st_cast(to = 'POLYGON')
+      st_erase(prop_gr, rip_corr)
+    return(prop_frag_rip)
   }
 }
 ```
@@ -136,7 +131,7 @@ riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) 
 
 ```{r}
 
-reserve <- function(grid = property_fragment,boundary_property = property_boundary ) {
+reserve <- function(grid = property_fragment) {
   grid_boundary_sf <- st_as_sf(grid)
   
   cell_areas <- grid_boundary_sf |>
@@ -149,7 +144,7 @@ reserve <- function(grid = property_fragment,boundary_property = property_bounda
       head(n)
 
     area_check <-
-      sum((st_area(forest) / sum(st_area(boundary_property))) * 100 )
+      sum((st_area(forest) / sum(st_area(cell_areas))) * 100 )
 
     if (area_check >= set_units(25,1)) {
       break
@@ -176,25 +171,6 @@ no_reserve_area <- function(grid_property = property_fragment,
   
 
 }
-```
-
-# River Check
-
-```{r}
-riparian_buffer <-
-  function(boundary_property = property_boundary,
-           hydrology = hydro) {
- # check if there's is river crossing property and subset
-    if (lengths(st_intersects(boundary_property, hydrology)) > 0) {
-      riparian <- st_intersection(hydrology, boundary_property) |>
-        st_make_valid() 
-  
-      return(riparian)
-      
-    } else{
-      return(NULL)
-    }
-  }
 ```
 
 # Divide Area into paddocks and hedgerows
