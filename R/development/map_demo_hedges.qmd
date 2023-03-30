@@ -1,0 +1,251 @@
+# Libraries
+
+```{r}
+#| include: false
+library(sf)
+library(tmap)
+library(tidyverse)
+library(here)
+library(units)
+library(knitr)
+```
+
+# Source Functions
+
+```{r}
+#| include: false
+
+
+
+# For Simulation including Hedgerows into 25%
+source(knitr::purl(here('src', "lup_simulator_hedges.qmd")))
+```
+
+# Input Data
+
+```{r}
+#| include: false
+
+limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
+
+
+
+hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/river_buffer.gpkg')
+
+```
+
+# Select Property
+
+```{r}
+
+property_boundary <- select_property(18)
+plot(property_boundary)
+
+```
+
+# Riparian Corridor check
+
+```{r}
+# |include: false
+riparian_corridor <- riparian_buffer(
+  boundary_property = property_boundary,
+  hydrology = hydro)
+
+
+
+```
+
+# Input of Paddock and Hedgerow Dimensions
+
+```{r}
+pad_hedg_dim <- property_dimensions(desired_area = 999999 ,
+                                hedgerow_width = 100,
+                                width_paddock = 3,
+                                height_paddock = 1)
+
+```
+
+# Create Grid & Rotate
+
+```{r}
+property_grid <- grid_rotate(
+  boundary_property = property_boundary,
+  x_y = pad_hedg_dim)
+
+plot(property_grid)
+```
+
+```{r}
+# cut grid with river
+property_fragment <- riparian_cut(rip_corr = riparian_corridor, prop_gr = property_grid)
+plot(property_fragment)
+```
+
+```{r}
+hedgerows <- make_hedges(fragment = property_fragment,
+                        boundary_property = property_boundary,
+                        corridor = riparian_corridor)
+plot(hedgerows, col = 'green')
+
+
+
+```
+
+```{r}
+paddocks <- st_difference(property_fragment, hedgerows)
+plot(paddocks, col = 'beige')
+
+paddock_area_per <- round(sum((st_area(paddocks)))/ st_area(property_boundary) * 100 ,2) 
+```
+
+
+
+```{r}
+if(is.null(riparian_corridor) == FALSE) {
+  riparian_area <- sum(round(st_area(riparian_corridor), 2))
+  riparian_area_per <- (riparian_area / st_area(property_boundary)) * 100
+  
+  hedge <- st_erase(hedgerows, property_boundary)
+  hedges <- st_difference(hedgerows, hedge)
+  final_hedgerow <-
+    st_difference(hedges, riparian_corridor) |> st_sf() |>
+    st_collection_extract(type = 'POLYGON')
+  
+} else{
+  riparian_area <- NA
+  riparian_area_per <- NA
+  hedge <- st_erase(hedgerows, property_boundary)
+  hedges <- st_difference(hedgerows, hedge)
+  final_hedgerow <- hedges
+}
+```
+
+```{r}
+hedgerow_area <- sum((st_area(final_hedgerow)))
+
+hedgerow_per <- (hedgerow_area / st_area(property_boundary))* 100
+```
+
+
+```{r}
+if(hedgerow_per <= set_units(25, 1)) {
+  
+  forest_reserve <- reserve(grid = paddocks , 
+                            hedge_per = hedgerow_per, 
+                            boundary_property = property_boundary)
+  fr_area <- sum(st_area(forest_reserve)) 
+  fr_per <- (fr_area/ sum(st_area(property_boundary))) * 100
+  
+  paddocks <- st_erase(paddocks, forest_reserve)
+  
+}else{
+    forest_reserve <-  NA
+    fr_area <- NA
+    fr_per <- NA 
+  }
+
+```
+
+
+```{r}
+plot(forest_reserve)
+
+```
+
+
+
+
+
+
+
+```{r}
+# FOR RETURNING VARIABLES TO MAKE MAPS
+  # If there is a corridor cut edges
+  if(is.null(riparian_corridor) == FALSE) {
+    final_hedgerow <- st_difference(hedges, riparian_corridor) |> st_sf() |> st_collection_extract(type = 'POLYGON') |> st_as_sfc()
+    riparian_corridor <- riparian_corridor |> st_as_sfc()
+
+  } else{
+    final_hedgerow <- hedges
+    riparian_corridor <- st_as_sf(st_sfc(NULL, crs = st_crs(final_hedgerow))) |> st_as_sfc() # Add an empty sf object with the same CRS
+
+  }
+```
+
+# Layers
+
+```{r}
+
+# forest_reserve <- st_as_sf(forest_reserve)
+# final_hedgerow <- st_as_sf(final_hedgerow) 
+# paddocks <- st_as_sf(paddocks)
+
+
+
+tmap_mode('view')
+tmap_options(check.and.fix = TRUE)
+tm_shape(property_boundary) +
+  tm_sf('red') +
+tm_shape(paddocks) +
+  tm_polygons(col = 'beige')+
+tm_shape(final_hedgerow) +
+  tm_polygons(col = 'green')+
+    tm_shape(riparian_corridor) +
+  tm_polygons(col = 'lightcyan')
+# tm_shape(forest_reserve) +
+#   tm_sf('forestgreen')
+
+#tmap_save(fr35,'/capstone/pyforest/capstone/R/undeveloped_region_simulation/fr35.png')
+
+
+
+
+
+tm_shape(paddocks) +
+  tm_sf('beige')
+  
+tm_shape(final_hedgerow) +
+  tm_sf(col = 'green')  
+  
+tm_shape(forest_reserve) +
+  tm_polygons(col = 'forestgreen')
+  
+tm_shape(riparian_corridor) +
+  tm_polygons(col = 'lightcyan')
+
+tm_shape(property_boundary) +
+  tm_sf()
+
+```
+
+# Final Areas
+
+```{r}
+statistics <- tibble(
+  id = property_boundary$cat,
+  property_area = st_area(property_boundary) |> drop_units(),
+  property_units = 'm^2',
+  fr_area = sum(st_area(forest_reserve)) |> drop_units(),
+  fr_units = 'm^2',
+  fr_per = round((sum((st_area(forest_reserve)) / st_area(property_boundary))) * 100,2)|> drop_units()
+,
+  paddocks_area = round(sum(st_area(paddocks)),2) |> drop_units(),
+  paddocks_units = 'm^2',
+  paddocks_per = round(sum(st_area(paddocks)) / st_area(property_boundary)* 100 ,2) |>  drop_units(),
+  hedgerow_area = sum(st_area(final_hedgerow)) |>  drop_units(),
+  hedgerow_units = 'm^2',
+  hedgerow_per = round((sum(st_area(final_hedgerow)) / st_area(property_boundary)) * 100,2) |> drop_units(),
+  riparian_area = riparian_area ,
+  riparian_units = 'm^2',
+  riparian_per = riparian_area_per
+    )
+statistics
+#saveRDS(statistics, "statistics.rds")
+```
+
+```{r}
+
+st_area(paddocks)
+statistics |> mutate(total_area = sum(fr_per, paddocks_per,hedgerow_per, riparian_per))
+
+```

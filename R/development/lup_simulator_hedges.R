@@ -1,12 +1,4 @@
----
-title: "functions"
-format: html
-editor: visual
----
 
-# Select Property
-
-```{r input data}
 select_property <- function(property_cat) {
   #property_cat <- as.character(property_cat)
   #property_cat <- paste0('0', property_cat)
@@ -22,11 +14,26 @@ select_property <- function(property_cat) {
 }
     
   
-```
 
-# Input of Paddock and Hedgerow Dimensions
 
-```{r}
+
+riparian_buffer <-
+  function(boundary_property = property_boundary,
+           hydrology = hydro) {
+ # check if there's is river crossing property and subset
+    if (lengths(st_intersects(boundary_property, hydrology)) > 0) {
+      riparian <- st_intersection(hydrology, boundary_property) |>
+        st_make_valid() 
+  
+      return(riparian)
+      
+    } else{
+      return(NULL)
+    }
+  }
+
+
+
 
 
 # 
@@ -58,11 +65,9 @@ property_dimensions <- function(desired_area = 999000 ,
 
 }
 
-```
 
-# Create Grid & Rotate
 
-```{r}
+
 grid_rotate <-
   function(boundary_property = property_boundary,
            x_y = pad_hedg_dim) {
@@ -115,11 +120,9 @@ grid_rotate <-
     return(test_rot)
   }
 
-```
 
-# Riparian Corridor
 
-```{r}
+
 
 riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) {
   # Using riparian corridor cut the property fragments
@@ -128,45 +131,62 @@ riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) 
   } else{
     prop_frag_rip <-
       st_difference(prop_gr, rip_corr) |> st_cast(to = 'MULTIPOLYGON') |> st_cast(to = 'POLYGON')
+    return(prop_frag_rip)
   }
 }
-```
 
-# Forest Reserve
 
-```{r}
 
-reserve <- function(grid = property_fragment,boundary_property = property_boundary ) {
-  grid_boundary_sf <- st_as_sf(grid)
+make_hedges <- function(fragment = property_remaining,
+                        boundary_property = property_boundary,
+                        corridor = riparian_corridor) {
+
+  fragment <- fragment[!st_geometry_type(fragment) %in% c("POINT")]  
   
-  cell_areas <- grid_boundary_sf |>
-    mutate(cell_area = st_area(grid_boundary_sf))
+  fragment <- fragment |> st_cast(to= 'MULTILINESTRING') |> st_make_valid() 
+  
+  hedge <- st_buffer(fragment, dist = 50, nQuadSegs = 60)  |>  st_as_sf() |> st_make_valid()  |>  st_union() 
+  
+  
+  return(hedge)
+}    
+
+
+
+
+reserve <- function(grid = paddocks , hedge_per = hedgerow_per, boundary_property = property_boundary ) {
+  paddock_sf <- st_as_sf(grid)
+  
+  cell_areas <- paddock_sf |>
+    mutate(cell_area = st_area(paddock_sf))
   
   n <- 1
   repeat {
     forest <-  cell_areas %>%
       arrange(cell_area) %>%
       head(n)
-
+    
     area_check <-
-      sum((st_area(forest) / sum(st_area(boundary_property))) * 100 )
-
-    if (area_check >= set_units(25,1)) {
+      sum((st_area(forest) / sum(st_area(boundary_property))) * 100) + hedge_per
+    
+    if (area_check >= set_units(25, 1)) {
       break
     }
     n <- n + 1
   }
   forest <- st_union(forest)
+  
   return(forest)
+  
 }
 
 
 
-```
 
-# Remaining Area w/o Forest Reserve
 
-```{r}
+
+
+
 no_reserve_area <- function(grid_property = property_fragment,
                             fr_union = forest_reserve){
   #remaining property without forest reserve
@@ -176,68 +196,47 @@ no_reserve_area <- function(grid_property = property_fragment,
   
 
 }
-```
 
-# River Check
 
-```{r}
-riparian_buffer <-
-  function(boundary_property = property_boundary,
-           hydrology = hydro) {
- # check if there's is river crossing property and subset
-    if (lengths(st_intersects(boundary_property, hydrology)) > 0) {
-      riparian <- st_intersection(hydrology, boundary_property) |>
-        st_make_valid() 
-  
-      return(riparian)
+
+reserve_with_hedgerows <-
+  function(frag = property_fragment,
+           limits = property_boundary,
+           pre_hedge =  hedges) {
+    # Calculate the area of the hedgerows
+    hedgerows_area <- sum(st_area(pre_hedge))
+    
+    # Adjust the desired area for forest reserve
+    desired_reserve_area <-
+      ((0.25 * st_area(limits)) - hedgerows_area) |> drop_units()
+    
+    
+    
+    # Create forest reserve with the adjusted desired area
+    grid_boundary_sf <- st_as_sf(frag)
+    
+    cell_areas <- grid_boundary_sf |>
+      mutate(cell_area = st_area(grid_boundary_sf))
+    
+    n <- 1
+    repeat {
+      forest2 <-  cell_areas %>%
+        arrange(cell_area) %>%
+        head(n)
       
-    } else{
-      return(NULL)
+      area_check <-
+        sum((st_area(forest2) / sum(st_area(limits))) * 100)  +  set_units(desired_reserve_area,1)
+      
+      if (area_check >= set_units(25, 1)) {
+        break
+      }
+      n <- n + 1
+      
     }
+    return(forest2)
   }
-```
 
-# Divide Area into paddocks and hedgerows
 
-```{r}
-make_hedges <- function(fragment = property_remaining) {
-  # Make remaining property without forest into a a solid polygon and regrid. Regridding creates individual cells with geometry that can be buffered for hedgerows
 
-  # prop_combine <- st_union(fragment, is_coverage = TRUE)
-  # 
-  # regrid <- grid_rotate(prop_combine) 
-
-  # Filter out POINT geometries
-  fragment <- fragment[!st_geometry_type(fragment) %in% c("POINT")]  
-  
-  fragment <- fragment |> st_cast(to= 'MULTILINESTRING') |> st_make_valid() #|> st_set_crs(value = 'EPSG:32721')
-  
-  hedge <- st_buffer(fragment, dist = 50, nQuadSegs = 60)  |>  st_as_sf() |> st_make_valid()  |>  st_union() 
-  
-  
-  
-  return(hedge)
-}    
-```
-
-```{r}
-
-make_paddocks <- function(frag = property_remaining, rows = hedgerows) {
-    # pad will give the combined paddocks as one polygon to so st_area only returns one value
-    #pad <- st_difference(prop_combine, hedgerow)
-      #fragment_valid <- st_union(frag) |> st_make_valid() |> st_cast(to = 'POLYGON')
-    #prop_combine <- st_union(frag, is_coverage = TRUE)
-    #regrid2 <- grid_rotate(prop_combine)
-    pad <-  st_difference(frag, rows)
-    return(pad)
-    
-# To get individual paddocks regrid area that has removed forest and take difference with hedgerows
-    
-  }
-```
-
-# `sf` st_erase
-
-```{r}
 st_erase = function(x, y) st_difference(x, st_union(st_combine(y)))
-```
+

@@ -808,4 +808,34 @@ percentages <- optimal_xy |>
 theme_apa(flextable(percentages))
 ```
 
+```{r}
+# purrr
+
+tic()
+# Make sure to register the number of cores you want to use for parallel processing
+# In this example, I am using 4 cores
+
+# Create a list of property ids
+property_ids <- unique(limit_lu$cat)
+
+# Create paddock dimensions
+paddock_dims <- create_paddock_dims()
+
+# Run the process_property function for each property id and paddock dimension
+results <- map_dfr(property_ids, function(property_id) {
+  pmap_dfr(list(
+    width_paddock = paddock_dims$width_paddock,
+    height_paddock = paddock_dims$height_paddock
+  ), function(width_paddock, height_paddock) {
+    process_property_nested(property_id, width_paddock, height_paddock)
+  })
+})
+
+# Combine the results
+results_df <- bind_rows(results)
+toc()
+```
+
+
+
 

@@ -89,7 +89,7 @@ grid_rotate <-
     grd <-
       sf::st_make_grid(tran(inpoly, -rotang, center),
                        cellsize = c(x_y[[1]], x_y[[2]]),
-                       n = 150)
+                       n = 50)
     
     
     
