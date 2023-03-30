@@ -24,7 +24,7 @@ source(knitr::purl(here('src', "lup_simulator.qmd")))
 
 limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
 
-limit_lu <- limit_lu[1654:1654,]
+limit_lu <- limit_lu[1,]
 
 hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/river_buffer.gpkg')
 
@@ -35,7 +35,7 @@ hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/rive
 
 ```{r}
 
-property_boundary <- select_property(1654)
+property_boundary <- select_property(1)
 plot(property_boundary)
 
 ```
@@ -338,7 +338,9 @@ if(is.null(riparian_corridor) == FALSE) {
   riparian_area_per <-
     sum((st_area(riparian_corridor)) / st_area(property_boundary)) * 100 
   final_hedgerow <- st_difference(hedges, riparian_corridor) |> st_sf() |>
-   st_collection_extract(type = 'POLYGON')
+   st_collection_extract(type = 'POLYGON') |> st_as_sfc()
+  riparian_corridor <-riparian_corridor$geom 
+  # riparian_corridor<- st_as_sf(riparian_corridor)
   
 } else{
   riparian_area <- NA
@@ -355,6 +357,7 @@ if(is.null(riparian_corridor) == FALSE) {
 forest_reserve <- st_as_sf(forest_reserve)
 final_hedgerow <- st_as_sf(final_hedgerow) 
 paddocks <- st_as_sf(paddocks)
+
 
 
 tmap_mode('view')

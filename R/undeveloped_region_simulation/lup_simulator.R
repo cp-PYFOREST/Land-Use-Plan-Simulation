@@ -135,7 +135,7 @@ reserve <- function(grid = property_fragment,boundary_property = property_bounda
     area_check <-
       sum((st_area(forest) / sum(st_area(boundary_property))) * 100 )
 
-    if (area_check >= set_units(25,1)) {
+    if (area_check >= set_units(50,1)) {
       break
     }
     n <- n + 1
