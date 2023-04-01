@@ -359,15 +359,15 @@ test_result <- process_property(example_property_id, example_width_paddock, exam
 #
 # results_df5608 25%
 # result_df5608_increase 50%
-#saveRDS(results, '~/../../capstone/pyforest/data/results_5608/results5608.rds')
-#saveRDS(results, '~/../../capstone/pyforest/data/results_5608/results5608_increase.rds')
+#saveRDS(results, '~/../../capstone/pyforest/data/results_5608/results5608_25.rds')
+#saveRDS(results, '~/../../capstone/pyforest/data/results_5608/results5608_50.rds')
 
 ```
 
 # Reload data 
 ```{r}
 # load in results as running script again will overwrite results variable
-results5608 <- readRDS("/Users/romero61/../../capstone/pyforest/data/results_5608/results5608.rds")
+results5608 <- readRDS("/Users/romero61/../../capstone/pyforest/data/results_5608/results5608_25.rds")
 
 ```
 
@@ -395,7 +395,7 @@ optimal_28 <- optimal |>
 rework_over28 <- limit_lu |> 
   filter(cat %in%  optimal_28$cat)
 
-limit_lu <- rework_over28 #run 797 properties
+limit_lu <- rework_over28 #run 797 properties paddocks = 990000
 ```
 
 
@@ -409,9 +409,10 @@ optimal_rwk <- optimalrwk_result %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 797 properties
+  ungroup()  %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE) # 797 properties
 
-# Second Subset paddocks = 980000
+# Second Subset 
 optimal_28_2 <- optimal_rwk |> 
   filter(fr_per > 28)
 
@@ -419,7 +420,7 @@ optimal_28_2 <- optimal_rwk |>
 rework_over28_2 <- limit_lu |> 
   filter(cat %in%  optimal_28_2$cat)
 
-limit_lu <- rework_over28_2 #run 586 properties
+limit_lu <- rework_over28_2 #run 586 properties paddocks = 980000
 ```
 
 
@@ -433,7 +434,8 @@ optimal_rwk2 <- optimalrwk_result2 %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 596 properties
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE) # 596 properties
 
 # Third Subset 
 optimal_28_3 <- optimal_rwk2 |> 
@@ -451,7 +453,7 @@ optimal_28_3 <- optimal_rwk2 |>
 rework_over28_3 <- limit_lu |> 
   filter(cat %in%  optimal_28_3$cat)
 
-limit_lu <- rework_over28_3 # run 433 properties
+limit_lu <- rework_over28_3 # run 433 properties Paddocks =950000
 ```
 
 
@@ -465,7 +467,8 @@ optimal_rwk3 <- optimalrwk_result3 %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 433 properties
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)# 433 properties
 
 
 # FOURTH Subset 
@@ -476,9 +479,7 @@ optimal_28_4 <- optimal_rwk3 |>
 
 theme_zebra(flextable(optimal_28_4)) # STILL AN ISSUE 
 
-# Lets doa visual check 
-tm_shape(limit_lu) + 
-  tm_sf()
+
 
 #Reset to rerun
 optimal_28_4 <- optimal_rwk3 |> 
@@ -502,7 +503,8 @@ optimal_rwk4 <- optimalrwk_result4 %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 208 properties
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)# 208 properties
 
 # FIFTH Subset 
 optimal_28_5 <- optimal_rwk4 |> 
@@ -526,7 +528,8 @@ optimal_rwk5 <- optimalrwk_result5 %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 76 properties
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)# 76 properties
 
 
 # Sixth Subset 
@@ -551,7 +554,8 @@ optimal_rwk6 <- optimalrwk_result6 %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 20 properties
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)# 20 properties
 
 ### STILL FOUR PROPERTIES OVER 28
 ### 1] 28.17 31.23 43.93 28.12
@@ -582,7 +586,8 @@ optimal_rwk7 <- optimalrwk_result7 %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 4 properties
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)# 4 properties
 
 # last Subset 
 optimal_28_8 <- optimal_rwk7 |> 
@@ -606,7 +611,8 @@ optimal_rwk8 <- optimalrwk_result8 %>%
   group_by(cat) %>%
   arrange(cat, desc(paddocks_area), desc(fr_area)) %>%
   slice(1) %>%
-  ungroup() # 4 properties
+  ungroup() %>%
+  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)# 4 properties
 ```
 
 # OPTIMAL DIMENSIONS AND PADDOCKS
@@ -642,30 +648,33 @@ optimal_28_8_r <- optimal_rwk7 |>
 optimal_rwk8
 
 # add in paddock size for those properties
-optimal_28_r <- optimal_28_r %>% mutate(paddock_size = 999000)
+optimal_28_r <- optimal_28_r %>% mutate(paddock_size = 999999)
 optimal_28_2_r <- optimal_28_2_r %>% mutate(paddock_size = 990000)
 optimal_28_3_r <- optimal_28_3_r %>% mutate(paddock_size = 980000)
-optimal_28_4_r <- optimal_28_4_r %>% mutate(paddock_size = 970000)
-optimal_28_5_r <- optimal_28_5_r %>% mutate(paddock_size = 950000)
-optimal_28_6_r <- optimal_28_6_r %>% mutate(paddock_size = 900000)
-optimal_28_7_r <- optimal_28_7_r %>% mutate(paddock_size = 800000)
-optimal_28_8_r <- optimal_28_8_r %>% mutate(paddock_size = 700000)
-optimal_rwk8 <- optimal_rwk8 %>% mutate(paddock_size = 650000)
+optimal_28_4_r <- optimal_28_4_r %>% mutate(paddock_size = 950000)
+optimal_28_5_r <- optimal_28_5_r %>% mutate(paddock_size = 900000)
+optimal_28_6_r <- optimal_28_6_r %>% mutate(paddock_size = 800000)
+optimal_28_7_r <- optimal_28_7_r %>% mutate(paddock_size = 700000)
+optimal_28_8_r <- optimal_28_8_r %>% mutate(paddock_size = 650000)
+optimal_rwk8 <- optimal_rwk8 %>% mutate(paddock_size = 600000)
 
 optimal_xy <- bind_rows(optimal_28_r, optimal_28_2_r, optimal_28_3_r, optimal_28_4_r, optimal_28_5_r, optimal_28_6_r, optimal_28_7_r, optimal_28_8_r, optimal_rwk8)
 
 
-optimal_xy <- bind_rows(optimal_28_r, optimal_28_2_r, optimal_28_3_r, optimal_28_4_r, optimal_28_5_r, optimal_28_6_r, optimal_28_7_r, optimal_28_8_r, optimal_rwk8) |> 
-  separate(ratio_xy, into = c("width_paddock", "height_paddock"), sep = "/", convert = TRUE, remove = FALSE)
+
 
 
 
 # Finally, save the optimal xy for each property to create a lup with 25% forest reserve
 # 
-#saveRDS(optimal_xy, '/Users/romero61/../../capstone/pyforest/data/results_5608/optimal_xy.rds')
+#saveRDS(optimal_xy, '/Users/romero61/../../capstone/pyforest/data/results_5608/optimal_xy_25.rds')
 ```
 
 ```{r}
+
+# Reload Mock properties
+
+limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
 # dataset to create map
 # 
 optimal_mock_properties <- limit_lu |> 
@@ -674,7 +683,7 @@ optimal_mock_properties <- limit_lu |>
             by = "cat")
 #save 
 #
-#st_write(optimal_mock_properties, '/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties.gpkg')
+#st_write(optimal_mock_properties, '/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties_25.gpkg')
 ```
 # DEBUG DUPLICATES
 

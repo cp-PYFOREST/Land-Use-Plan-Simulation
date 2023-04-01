@@ -38,7 +38,7 @@ hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/rive
 
 ```{r}
 
-property_boundary <- select_property(18)
+property_boundary <- select_property(1)
 plot(property_boundary)
 
 ```
@@ -46,6 +46,7 @@ plot(property_boundary)
 # Riparian Corridor check
 
 ```{r}
+
 # |include: false
 riparian_corridor <- riparian_buffer(
   boundary_property = property_boundary,
@@ -60,8 +61,8 @@ riparian_corridor <- riparian_buffer(
 ```{r}
 pad_hedg_dim <- property_dimensions(desired_area = 999999 ,
                                 hedgerow_width = 100,
-                                width_paddock = 3,
-                                height_paddock = 1)
+                                width_paddock = 4,
+                                height_paddock = 3)
 
 ```
 
@@ -82,9 +83,7 @@ plot(property_fragment)
 ```
 
 ```{r}
-hedgerows <- make_hedges(fragment = property_fragment,
-                        boundary_property = property_boundary,
-                        corridor = riparian_corridor)
+hedgerows <- make_hedges(fragment = property_fragment)
 plot(hedgerows, col = 'green')
 
 

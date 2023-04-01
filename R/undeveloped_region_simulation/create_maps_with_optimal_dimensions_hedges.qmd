@@ -14,12 +14,12 @@ library(purrr)
 
 ```{r}
 #source(knitr::purl(here("src", "boundary_registry_data.qmd")))
-source(knitr::purl(here('src', "lup_simulator.qmd")))
+source(knitr::purl(here('src', "lup_simulator_hedges.qmd")))
 
 ```
 
 ```{r}
-limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties.gpkg')
+limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties_hedges.gpkg')
 
 #to read in rework if not loaded
 # limit_lu <- st_read("/Users/romero61/../../capstone/pyforest/data/rework/rwk_over28.gpkg")
@@ -45,7 +45,7 @@ process_property_no_stats <- function(property_id, width_paddock, height_paddock
            hydrology = hydro)
   
   # Property dimensions
-  pad_hedg_dim <- property_dimensions(
+    pad_hedg_dim <- property_dimensions(
     desired_area = paddock_size,
     hedgerow_width = 100,
     width_paddock = width_paddock,
@@ -56,35 +56,53 @@ process_property_no_stats <- function(property_id, width_paddock, height_paddock
   
   # Cut Grid w/ River
   property_fragment <- riparian_cut(riparian_corridor, property_grid)
-
-  # Create Forest Reserve ≥ 25% 
-  forest_reserve <- reserve(property_fragment,property_boundary)
   
-  # Property w/o reserve area
-  property_remaining <- no_reserve_area(grid_property = property_fragment,
-                  fr_union = forest_reserve)
+    # Hedgerows
+  hedgerows <- make_hedges(fragment = property_fragment)
 
-  # Hedgerows
-  hedgerows <- make_hedges(property_remaining)
-  
-  hedge <- st_erase(hedgerows, property_boundary)
-  hedges <- st_difference(hedgerows, hedge)
-  cut_reserve <- st_intersection(forest_reserve, hedges)
-  hedges <- st_difference(hedges, cut_reserve) |> st_simplify(dTolerance = 10)
-    
   # Paddocks
-  paddocks <- make_paddocks(property_remaining, hedgerows)
+  paddocks <- st_difference(property_fragment, hedgerows)
+ 
+  
+  
+  
 
-  # If there is a corridor cut edges
-  if(is.null(riparian_corridor) == FALSE) {
-    final_hedgerow <- st_difference(hedges, riparian_corridor) |> st_sf() |> st_collection_extract(type = 'POLYGON') |> st_as_sfc()
+  if (is.null(riparian_corridor) == FALSE) {
+    
+    hedge <- st_erase(hedgerows, property_boundary)
+    hedges <- st_difference(hedgerows, hedge)
+    final_hedgerow <-
+      st_difference(hedges, riparian_corridor) |> st_sf() |>
+      st_collection_extract(type = 'POLYGON') |> st_as_sfc()
     riparian_corridor <- riparian_corridor |> st_as_sfc()
 
+    
   } else{
+
+    hedge <- st_erase(hedgerows, property_boundary)
+    hedges <- st_difference(hedgerows, hedge)
     final_hedgerow <- hedges
-    riparian_corridor <- st_as_sf(st_sfc(NULL, crs = st_crs(final_hedgerow))) |> st_as_sfc() # Add an empty sf object with the same CRS
+    riparian_corridor <- st_as_sf(st_sfc(NULL, crs = st_crs(property_boundary))) |> st_as_sfc() # Add an empty sf object with the same CRS
+  }
+  
+  # Area Check for 25% minimun
+  hedgerow_area <- sum((st_area(final_hedgerow)))
+  hedgerow_per <- (hedgerow_area / st_area(property_boundary)) * 100
+  
+  if (hedgerow_per <= set_units(25, 1)) {
+    forest_reserve <- reserve(grid = paddocks ,
+                              hedge_per = hedgerow_per,
+                              boundary_property = property_boundary)
+
+    paddocks <- st_erase(paddocks, forest_reserve)
+    
+  } else{
+    forest_reserve <-   st_as_sf(st_sfc(NULL, crs = st_crs(property_boundary))) |> st_as_sfc()
 
   }
+  
+  
+  
   
     land_types <- list(
     forest_reserve = forest_reserve,
@@ -167,7 +185,7 @@ process_property_reshaped <- function(property_id, width_paddock, height_paddock
 tic()
 # Make sure to register the number of cores you want to use for parallel processing
 # In this example, I am using 4 cores
-plan(multisession, workers = 25)
+plan(multisession, workers = 19)
 
 # Create a list of property ids
 property_ids <- unique(limit_lu$cat)
@@ -185,10 +203,10 @@ toc()
 ```
 
 ```{r}
-#saveRDS(property_results,"/Users/romero61/../../capstone/pyforest/data/results_5608/property_results3.rds")
+#saveRDS(property_results,"/Users/romero61/../../capstone/pyforest/data/results_5608/property_results_hedges.rds")
 
 
-property_results_copy <- readRDS("/Users/romero61/../../capstone/pyforest/data/results_5608/property_results3.rds")
+property_results_copy <- readRDS("/Users/romero61/../../capstone/pyforest/data/results_5608/property_results_hedges.rds")
 
 
 property_results_aggregated <- property_results %>%
@@ -200,6 +218,6 @@ property_results_aggregated <- property_results %>%
 
 
 ```{r}
-#st_write(property_results_aggregated,  "/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_lup.gpkg")
+#st_write(property_results_aggregated,  "/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_lup_hedges.gpkg")
 ```
 

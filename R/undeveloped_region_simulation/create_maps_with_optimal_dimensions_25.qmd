@@ -1,0 +1,205 @@
+```{r}
+library(sf)
+library(tidyverse)
+library(here)
+library(units)
+library(knitr)
+library(tictoc)
+library(parallel)
+library(doParallel)
+library(furrr)
+library(purrr)
+
+```
+
+```{r}
+#source(knitr::purl(here("src", "boundary_registry_data.qmd")))
+source(knitr::purl(here('src', "lup_simulator.qmd")))
+
+```
+
+```{r}
+limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties_25.gpkg')
+
+#to read in rework if not loaded
+# limit_lu <- st_read("/Users/romero61/../../capstone/pyforest/data/rework/rwk_over28.gpkg")
+
+hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/river_buffer.gpkg')
+
+```
+
+# Parallel Functions
+
+```{r}
+#| include: false
+
+process_property_no_stats <- function(property_id, width_paddock, height_paddock,paddock_size) {
+  
+  property_id <- as.integer(property_id)
+  
+  # Select Property
+  property_boundary <- select_property(property_id)
+  
+  # Riparian Corridor check
+  riparian_corridor <- riparian_buffer(boundary_property = property_boundary,
+           hydrology = hydro)
+  
+  # Property dimensions
+  pad_hedg_dim <- property_dimensions(
+    desired_area = paddock_size,
+    hedgerow_width = 100,
+    width_paddock = width_paddock,
+    height_paddock = height_paddock)
+  
+  # Create Grid , Rotate, Cut With Property
+  property_grid <- grid_rotate(property_boundary, pad_hedg_dim)
+  
+  # Cut Grid w/ River
+  property_fragment <- riparian_cut(riparian_corridor, property_grid)
+
+  # Create Forest Reserve ≥ 25% 
+  forest_reserve <- reserve(property_fragment,property_boundary)
+  
+  # Property w/o reserve area
+  property_remaining <- no_reserve_area(grid_property = property_fragment,
+                  fr_union = forest_reserve)
+
+  # Hedgerows
+  hedgerows <- make_hedges(property_remaining)
+  
+  hedge <- st_erase(hedgerows, property_boundary)
+  hedges <- st_difference(hedgerows, hedge)
+  cut_reserve <- st_intersection(forest_reserve, hedges)
+  hedges <- st_difference(hedges, cut_reserve) |> st_simplify(dTolerance = 10)
+    
+  # Paddocks
+  paddocks <- make_paddocks(property_remaining, hedgerows)
+
+  # If there is a corridor cut edges
+  if(is.null(riparian_corridor) == FALSE) {
+    final_hedgerow <- st_difference(hedges, riparian_corridor) |> st_sf() |> st_collection_extract(type = 'POLYGON') |> st_as_sfc()
+    riparian_corridor <- riparian_corridor |> st_as_sfc()
+
+  } else{
+    final_hedgerow <- hedges
+    riparian_corridor <- st_as_sf(st_sfc(NULL, crs = st_crs(final_hedgerow))) |> st_as_sfc() # Add an empty sf object with the same CRS
+
+  }
+  
+    land_types <- list(
+    forest_reserve = forest_reserve,
+    paddocks = paddocks,
+    final_hedgerow = final_hedgerow,
+    riparian_corridor = riparian_corridor)
+  
+  return(land_types)
+}
+
+  
+
+```
+
+# Function for furrr
+
+```{r}
+process_property_nested <- function(property_id, width_paddock, height_paddock,paddock_size) {
+  result <- process_property(property_id, width_paddock, height_paddock,paddock_size)
+  return(result)
+}
+
+
+
+```
+
+```{r}
+process_property_reshaped <- function(property_id, width_paddock, height_paddock, paddock_size) {
+  result <- process_property_no_stats(property_id, width_paddock, height_paddock, paddock_size)
+  
+
+  
+  land_types <- bind_rows(
+    tibble(
+      property_id = property_id,
+      width_paddock = width_paddock,
+      height_paddock = height_paddock,
+      land_type = "forest_reserve",
+      geometry = result$forest_reserve 
+    ),
+    tibble(
+      property_id = property_id,
+      width_paddock = width_paddock,
+      height_paddock = height_paddock,
+      land_type = "paddocks",
+      geometry = result$paddocks 
+    ),
+    tibble(
+      property_id = property_id,
+      width_paddock = width_paddock,
+      height_paddock = height_paddock,
+      land_type = "final_hedgerow",
+      geometry = result$final_hedgerow 
+    ),
+    tibble(
+      property_id = property_id,
+      width_paddock = width_paddock,
+      height_paddock = height_paddock,
+      land_type = "riparian_corridor",
+      geometry = result$riparian_corridor
+    )
+  )
+  
+  return(land_types)
+
+
+}
+
+
+
+
+
+```
+
+# furrr
+
+```{r}
+#| include: false
+#| warning: false
+tic()
+# Make sure to register the number of cores you want to use for parallel processing
+# In this example, I am using 4 cores
+plan(multisession, workers = 19)
+
+# Create a list of property ids
+property_ids <- unique(limit_lu$cat)
+
+# Run the process_property_no_stats function for each property id with the optimal width and height
+property_results <- future_map_dfr(property_ids, function(property_id) {
+  property_optimal_dims <- limit_lu[limit_lu$cat == property_id, c("width_paddock", "height_paddock", "paddock_size")]
+  processed_property <- process_property_reshaped(property_id, property_optimal_dims$width_paddock, property_optimal_dims$height_paddock, property_optimal_dims$paddock_size)
+  return(processed_property)
+  
+})
+
+
+toc()
+```
+
+```{r}
+#saveRDS(property_results,"/Users/romero61/../../capstone/pyforest/data/results_5608/property_results_25.rds")
+
+
+property_results_copy <- readRDS("/Users/romero61/../../capstone/pyforest/data/results_5608/property_results_25.rds")
+
+
+property_results_aggregated <- property_results %>%
+  group_by(property_id, width_paddock, height_paddock, land_type) %>%
+  summarize(geometry = st_union(geometry)) %>%
+  ungroup()
+
+```
+
+
+```{r}
+#st_write(property_results_aggregated,  "/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_lup_25.gpkg")
+```
+

@@ -157,9 +157,7 @@ riparian_cut <- function(rip_corr = riparian_corridor, prop_gr = property_grid) 
 # Create Hedgerows for entire area
 
 ```{r}
-make_hedges <- function(fragment = property_remaining,
-                        boundary_property = property_boundary,
-                        corridor = riparian_corridor) {
+make_hedges <- function(fragment = property_remaining) {
 
   fragment <- fragment[!st_geometry_type(fragment) %in% c("POINT")]  
   
@@ -171,7 +169,6 @@ make_hedges <- function(fragment = property_remaining,
   return(hedge)
 }    
 ```
-
 
 # Forest Reserve
 
@@ -261,8 +258,6 @@ reserve_with_hedgerows <-
     return(forest2)
   }
 ```
-
-
 
 # `sf` st_erase
 
