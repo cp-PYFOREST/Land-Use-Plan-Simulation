@@ -1,0 +1,428 @@
+# Libraries
+
+```{r}
+#| include: false
+library(sf)
+library(tmap)
+library(tidyverse)
+library(here)
+library(units)
+library(knitr)
+```
+
+# Source Functions
+
+```{r}
+#| include: false
+source(knitr::purl(here('src', "lup_simulator.qmd")))
+```
+
+# Input Data
+
+```{r}
+#| include: false
+
+limit_lu <- st_read('/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
+
+
+hydro <- st_read('/Users/romero61/../../capstone/pyforest/data/river_buffer/river_buffer.gpkg')
+
+```
+
+
+# Select Property
+
+```{r}
+
+property_boundary <- select_property(1)
+plot(property_boundary)
+
+```
+
+# Riparian Corridor check 
+
+```{r}
+if (lengths(st_intersects(property_boundary, hydro)) > 0) {
+      riparian <- st_intersection(hydro, property_boundary) |>
+        st_make_valid() }
+plot(riparian)
+```
+
+
+```{r}
+# |include: false
+riparian_corridor <- riparian_buffer()
+plot(riparian_corridor)
+```
+
+
+
+```{r}
+y <- sqrt(999999 / (1/3)) + (50)
+
+x <- sqrt((999999 * (1/3))) + (50)
+```
+
+
+
+
+# Input of Paddock and Hedgerow Dimensions
+
+```{r}
+pad_hedg_dim <- property_dimensions(desired_area = 999999 ,
+                                hedgerow_width = 100,
+                                width_paddock = 2,
+                                height_paddock = 3)
+
+```
+
+# Create Grid & Rotate
+
+```{r}
+property_grid <- grid_rotate()
+plot(property_grid)
+```
+
+```{r}
+# cut grid with river
+property_fragment <- riparian_cut()
+tmap_mode('view')
+tmap_options(check.and.fix = TRUE)
+tm_shape(property_grid) +
+  tm_sf(col = 'forestgreen') +
+  tm_shape(property_fragment) +
+  tm_polygons(col = 'beige')+
+  tm_shape(riparian_corridor) +
+  tm_borders(col = 'red')
+plot(property_fragment, col = 'green')
+```
+
+```{r}
+#build if statement where n has to be irregular then start collecting by number
+#
+#
+
+test_boundary_sf <- st_as_sf(property_grid)
+  
+  test_areas <- test_boundary_sf |>
+    mutate(cell_area = st_area(test_boundary_sf),
+           cell_number = 1:nrow(test_areas))
+  max_area <- max(test_areas$cell_area)
+   
+   test_areas2 <- test_areas |>
+    mutate(cell_number = 1:nrow(test_areas))
+   
+
+tm_shape(test_areas) +
+  tm_sf(col = 'cell_area')   
+      
+
+```
+```{r}
+tm_shape(test_areas2) +
+  tm_sf(col = 'cell_number')
+```
+
+```{r}
+tm_shape(orest) +
+  tm_sf()
+```
+
+
+```{r}
+
+
+n <- 1
+  repeat {
+    tf <-  test_areas %>%
+      arrange(test_areas$cell_area) %>%
+      head(n)
+    
+    
+    check <-
+      sum((st_area(tf) / sum(st_area(test_areas))) * 100 )
+    
+    if (check >= set_units(25,1) ) {
+      break}
+    n <- n + 1
+  }
+```
+
+
+```{r}
+
+test_boundary_sf <- st_as_sf(property_grid)
+  
+  test_areas <- test_boundary_sf |>
+    mutate(cell_area = st_area(test_boundary_sf),
+           cell_number = 1:nrow(test_areas))
+  max_area <- max(test_areas$cell_area)
+  
+
+n <- 1
+repeat {
+  tf <- test_areas %>%
+    arrange(cell_area) %>%
+    head(n)
+  
+  check <- sum((st_area(tf) / sum(st_area(test_areas))) * 100)
+  
+  if (check >= set_units(25, 1)) {
+    last_row <- tf |> slice_tail()
+    if(last_row$cell_area == max_area) {
+          repeat{  n <- n - 1}
+
+      tf2 <- test_areas %>%
+        filter(cell_area == max(test_areas$cell_area)) %>%
+        arrange(cell_number) %>%
+        head(n)
+      final_tf <- bind_rows(tf, tf2)
+      check <- sum((st_area(final_tf) / sum(st_area(test_areas))) * 100)}
+    }
+    break
+  }
+  n <- n + 1
+}
+
+```
+
+
+
+# Create Forest Reserve ≥ 25% & \< 28%
+
+
+```{r}
+ rid_boundary_sf <- st_as_sf(property_fragment)
+  
+  ell_areas <- rid_boundary_sf |>
+    mutate(cell_area = st_area(rid_boundary_sf))
+  
+  n <- 1
+  repeat {
+    orest <-  ell_areas %>%
+      arrange(cell_area) %>%
+      head(n)
+    rea_check <-
+      sum((st_area(orest) / sum(st_area(ell_areas))) * 100 )
+    
+    if (rea_check >= set_units(25,1) ) {
+      break
+    }
+    n <- n + 1
+  }
+plot(orest)
+```
+
+
+```{r}
+forest_reserve <- reserve(property_fragment,property_boundary)
+  tm_shape(forest_reserve) +
+  tm_sf(col = 'blue')
+
+sum((st_area(forest_reserve)) / st_area(property_boundary)) * 100 
+plot(forest_reserve)
+```
+
+# Property w/o reserve area
+
+```{r}
+grd_sf <- st_as_sf(property_fragment)
+  fr_sf <- st_as_sf(forest_reserve)
+  property_remaining <- st_difference(property_fragment,forest_reserve ) 
+
+# st_write(property_remaining, "/Users/romero61/../../capstone/pyforest/data/simulation_test/prop_remaining.shp")
+plot(property_remaining)
+```
+
+
+```{r}
+property_remaining <-
+  no_reserve_area(grid_property = property_fragment,
+                  fr_union = forest_reserve)
+plot(property_remaining)
+
+tm_shape(property_remaining) +
+  tm_sf()+
+  tm_shape(forest_reserve) +
+  tm_sf(col = 'green')
+```
+
+# Hedgerows
+
+```{r}
+# Workshop function
+
+
+rop_combine <- property_remaining |> st_make_valid() |> st_simplify() |> st_union(is_coverage = TRUE)
+  plot(rop_combine)
+  rop_combine
+  # Filter out POINT and GEOMETRYCOLLECTION geometries
+
+  egrid <- grid_rotate(rop_combine)
+  
+
+
+# Filter out POINT geometries
+egrid2 <- property_remaining[!st_geometry_type(property_remaining) %in% c("POINT")]
+ 
+
+# # Extract point geometries from grid
+# point_geoms <- lapply(st_geometry(egrid), function(geom) {
+#   if(st_geometry_type(geom) == "POINT") {
+#     st_geometry(geom)
+#   } else if(st_geometry_type(geom) == "GEOMETRYCOLLECTION") {
+#     st_collection_extract(geom, "POINT")
+#   } else {
+#     NULL
+#   }
+# })
+# 
+# # Combine all point geometries into a single object
+# point_geoms <- do.call(rbind, point_geoms)
+# # Extract LINESTRING and POLYGON geometries from GEOMETRYCOLLECTION objects
+# gc_geoms <- lapply(st_geometry(egrid2), function(geom) {
+#   if(st_geometry_type(geom) == "GEOMETRYCOLLECTION") {
+#     st_collection_extract(geom, c("LINESTRING", "POLYGON"))
+#   } else {
+#     st_geometry(geom)
+#   }
+# })
+# 
+# # Combine all geometries into a single object
+# gc_geoms <- do.call(rbind, gc_geoms)
+# 
+# # Combine LINESTRING, POLYGON, and point geometries into a single object
+# egrid3 <- st_sfc(gc_geoms, point_geoms)
+
+# Cast combined geometries to MULTILINESTRING
+egrid3 <- st_cast(egrid2, to = "MULTILINESTRING")
+
+# Make sure resulting geometries are valid
+egrid3 <- st_make_valid(egrid3)
+  
+tmap_options(check.and.fix = TRUE)
+
+  edge <- st_buffer(egrid3, dist = 50)  |>  st_as_sf() |> st_make_valid()  |>  st_union() 
+tm_shape(edge) +
+  tm_sf()
+
+```
+
+```{r}
+hedgerows <- make_hedges()
+#Cut off buffer that extends over property boundary
+hedge <- st_erase(hedgerows,property_boundary) 
+hedges <- st_difference(hedgerows, hedge)
+cut_reserve <- st_intersection(forest_reserve,hedges  )
+hedges <- st_difference(hedges, cut_reserve) |> st_simplify(dTolerance = 10)
+  
+plot(hedges)
+plot(cut_reserve, col = 'green')
+
+```
+
+# Paddocks
+
+```{r}
+paddocks <- make_paddocks()
+plot(paddocks, col = 'beige')
+st_area(paddocks)
+```
+
+# If there is a corridor cut edges
+
+```{r}
+if(is.null(riparian_corridor) == FALSE) {
+  riparian_area <- sum(round(st_area(riparian_corridor),2))
+  riparian_area_per <-
+    sum((st_area(riparian_corridor)) / st_area(property_boundary)) * 100 
+  final_hedgerow <- st_difference(hedges, riparian_corridor) |> st_sf() |>
+   st_collection_extract(type = 'POLYGON') |> st_as_sfc()
+  riparian_corridor <-riparian_corridor$geom 
+  # riparian_corridor<- st_as_sf(riparian_corridor)
+  
+} else{
+  riparian_area <- NA
+  riparian_area_per <- NA
+  final_hedgerow <- hedges
+}
+ plot(final_hedgerow)
+```
+
+# Layers
+
+```{r}
+
+forest_reserve <- st_as_sf(forest_reserve)
+final_hedgerow <- st_as_sf(final_hedgerow) 
+paddocks <- st_as_sf(paddocks)
+
+
+
+tmap_mode('view')
+tmap_options(check.and.fix = TRUE)
+tm_shape(property_boundary) +
+  tm_sf('red') +
+tm_shape(forest_reserve) +
+  tm_polygons(col = 'forestgreen')+
+tm_shape(final_hedgerow) +
+  tm_polygons(col = 'green')+
+tm_shape(paddocks) +
+  tm_sf('beige')+
+  tm_shape(riparian_corridor) +
+  tm_polygons(col = 'lightcyan')
+#tmap_save(fr35,'/capstone/pyforest/capstone/R/undeveloped_region_simulation/fr35.png')
+
+
+
+
+
+tm_shape(paddocks) +
+  tm_sf('beige')
+  
+tm_shape(final_hedgerow) +
+  tm_sf(col = 'green')  
+  
+tm_shape(forest_reserve) +
+  tm_polygons(col = 'forestgreen')
+  
+tm_shape(riparian_corridor) +
+  tm_polygons(col = 'lightcyan')
+
+tm_shape(property_boundary) +
+  tm_sf()
+
+```
+
+
+# Final Areas
+
+```{r}
+statistics <- tibble(
+  id = property_boundary$cat,
+  property_area = st_area(property_boundary) |> drop_units(),
+  property_units = 'm^2',
+  fr_area = sum(st_area(forest_reserve)) |> drop_units(),
+  fr_units = 'm^2',
+  fr_per = round((sum((st_area(forest_reserve)) / st_area(property_boundary))) * 100,2)|> drop_units()
+,
+  paddocks_area = round(sum(st_area(paddocks)),2) |> drop_units(),
+  paddocks_units = 'm^2',
+  paddocks_per = round(sum(st_area(paddocks)) / st_area(property_boundary)* 100 ,2) |>  drop_units(),
+  hedgerow_area = sum(st_area(final_hedgerow)) |>  drop_units(),
+  hedgerow_units = 'm^2',
+  hedgerow_per = round((sum(st_area(final_hedgerow)) / st_area(property_boundary)) * 100,2) |> drop_units(),
+  riparian_area = riparian_area ,
+  riparian_units = 'm^2',
+  riparian_per = riparian_area_per
+    )
+statistics
+#saveRDS(statistics, "statistics.rds")
+```
+
+```{r}
+
+st_area(paddocks)
+statistics |> mutate(total_area = sum(fr_per, paddocks_per,hedgerow_per, riparian_per))
+
+```

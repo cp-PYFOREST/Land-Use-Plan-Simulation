@@ -1,0 +1,228 @@
+---
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+```{r}
+library(sf)
+library(tmap)
+library(tidyverse)
+library(here)
+library(knitr)
+library(mapview)
+library(units)
+```
+
+```{r}
+
+source(knitr::purl(here('src', "lup_simulator.qmd")))
+
+```
+
+
+
+
+```{r}
+study_boundary <- st_read('/capstone/pyforest/data/study_boundary/study_boundary.shp')
+
+developed_region <- st_read('/capstone/pyforest/data/developed_region/developed_region.gpkg')
+
+
+
+undeveloped_region <- st_difference(study_boundary, developed_region)
+tm_shape(undeveloped_region) +
+   tm_sf(col = 'red')
+
+```
+
+```{r}
+dimensions <- property_dimensions(desired_area = 40000000,
+                                  hedgerow_width = 0,
+                                  width_paddock = 1,
+                                  height_paddock = 1)
+
+# 
+grd_no_rotation <- sf::st_make_grid(undeveloped_region,
+                       cellsize =c(dimensions[[1]], dimensions[[2]]),
+                       n = 150) |> st_as_sf()
+
+grd_no_rotation_study <- st_intersection(grd_no_rotation,study_boundary)
+
+undeveloped_gridded <- st_difference(grd_no_rotation_study, developed_region) 
+
+
+
+```
+
+
+```{r}
+undeveloped1 <- undeveloped_gridded |> 
+   st_cast(to = 'MULTIPOLYGON') |>
+  st_cast(to = 'POLYGON') |>
+  st_make_valid()
+
+
+undeveloped2 <- undeveloped1 |>
+  mutate(area = st_area(undeveloped1), .before = x) |>
+  drop_units() |>
+  filter(area >= 2000000) |>
+  rename(geometry = x) |>
+  select(area)
+
+
+
+mock_properties <- undeveloped2 |>
+  mutate(cat = seq(1:nrow(undeveloped2)), .before = area) 
+
+
+sum(st_area(undeveloped_gridded)) 
+tm_shape(undeveloped_gridded) +
+  tm_sf(col = 'forestgreen') 
+#st_write(mock_properties, '/Users/romero61/../../capstone/pyforest/data/mock_properties/mock_properties.shp')
+```
+
+
+# Changes in order reduce total area
+
+```{r}
+# 
+
+#study_gridded <- grid_rotate(boundary_property = study_boundary, x_y = dimensions) |> st_as_sf()
+# 
+# 
+# 
+# tmap_mode('view')
+# tmap_options(check.and.fix = TRUE)
+# tm_shape(study_gridded) +
+#    tm_borders(col = 'red') +
+#   tm_shape(developed_region) +
+#    tm_sf(col = 'black') 
+
+```
+
+```{r}
+# cell_undeveloped <- st_difference(study_gridded, developed_region)
+# sum(st_area(cell_undeveloped))
+# 
+# undeveloped3 <- cell_undeveloped |> 
+#    st_cast(to = 'MULTIPOLYGON') |>
+#   st_cast(to = 'POLYGON') |>
+#   st_make_valid()
+# 
+# undeveloped4 <- undeveloped3 |>
+#   mutate(area = st_area(undeveloped3), .before = x) |>
+#   drop_units() |>
+#   filter(area >= 2000000) |>
+#   rename(geometry = x) |>
+#   select(area)
+# 
+# 
+# 
+# mock_properties2 <- undeveloped4 |>
+#   mutate(cat = seq(1:nrow(undeveloped4)), .before = area) 
+# 
+# 
+# sum(st_area(mock_properties2))
+# tm_shape(mock_properties2) +
+#    tm_sf(col = 'red')
+```
+
+```{r}
+
+
+# study_gridded2 <- grid_rotate(boundary_property = undeveloped_region, x_y = dimensions) |> st_as_sf()
+# 
+# 
+# undeveloped5 <- study_gridded2 |> 
+#    st_cast(to = 'MULTIPOLYGON') |>
+#   st_cast(to = 'POLYGON') |>
+#   st_make_valid()
+# 
+# undeveloped6 <- undeveloped5 |>
+#   mutate(area = st_area(undeveloped5), .before = x) |>
+#   drop_units() |>
+#   filter(area >= 2000000) |>
+#   rename(geometry = x) |>
+#   select(area)
+# 
+# 
+# 
+# mock_properties3 <- undeveloped6 |>
+#   mutate(cat = seq(1:nrow(undeveloped6)), .before = area) 
+# 
+# 
+# sum(st_area(mock_properties3))
+# tm_shape(mock_properties2) +
+#    tm_sf(col = 'red')
+
+```
+
+
+
+```{r}
+# area <- st_area(study_undeveloped)
+# print(paste0('Total undeveloped area:', area ))
+# print('undev1')
+# sum(undeveloped1$area)
+# print('undev2')
+# 
+# sum(undeveloped2$area)
+# print('undev3')
+# 
+# sum(undeveloped3$area)
+
+```
+
+# HEXAGON Properties
+
+```{r}
+dimensions2 <- property_dimensions(desired_area = 40000000,
+                                  hedgerow_width = 0,
+                                  width_paddock = 1,
+                                  height_paddock = 1)
+
+# 
+grd_no_rotation2 <- sf::st_make_grid(
+  undeveloped_region,
+  cellsize = c(dimensions2[[1]], dimensions2[[2]]),
+  n = 150, 
+  square = FALSE) |>
+  st_as_sf()
+
+grd_no_rotation_study2 <- st_intersection(grd_no_rotation2,study_boundary)
+
+undeveloped_gridded2 <- st_difference(grd_no_rotation_study2, developed_region) 
+```
+
+
+```{r}
+filterpoints <-  undeveloped_gridded2[!st_geometry_type(undeveloped_gridded2) %in% c("POINT"),]
+
+
+undeveloped12 <- filterpoints |> 
+   st_cast(to = 'MULTIPOLYGON') |>
+  st_cast(to = 'POLYGON') |>
+  st_make_valid()
+
+
+undeveloped22 <- undeveloped12 |>
+  mutate(area = st_area(undeveloped12), .before = x) |>
+  drop_units() |>
+  filter(area >= 2000000) |>
+  rename(geometry = x) |>
+  select(area)
+
+
+
+mock_properties2 <- undeveloped22 |>
+  mutate(cat = seq(1:nrow(undeveloped22)), .before = area) 
+
+
+sum(st_area(mock_properties2)) # 92499619815 [m^2]
+tm_shape(undeveloped_gridded) +
+  tm_sf(col = 'forestgreen') 
+```
+
+
+

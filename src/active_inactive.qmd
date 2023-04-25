@@ -24,8 +24,7 @@ rm(forestry_registry)
 
 
 
-# Divide  into inactive 
-# Create a subset of the property_boundary dataset containing only properties with estado == 1, and select only the columns we need
+
 properties <- property_boundary |> 
   select(id, put_id, anho_capa, estado, cod_dpto, cod_dist) |> 
   mutate(year_inactive = NA, 

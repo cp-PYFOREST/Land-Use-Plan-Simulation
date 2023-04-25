@@ -1,0 +1,333 @@
+# Libraries
+```{r}
+library(sf)
+library(tidyverse)
+library(units)
+library(flextable)
+library(gt)
+library(colorspace)
+library(GGally)
+library(skimr)
+library(plotly)
+library(bbplot)
+library(ggthemr)
+```
+# Read in Data
+```{r}
+# 25% reserve
+optimal_xy_25 <-read_rds('/Users/romero61/../../capstone/pyforest/lup_simulation_data/results_5608/optimal_xy_5.rds') |> drop_units()
+
+# 25% reserve
+optimal_xy_25 <-read_rds('/Users/romero61/../../capstone/pyforest/lup_simulation_data/results_5608/optimal_xy_25.rds') |> drop_units()
+
+# 50% reserve
+optimal_xy_50 <-read_rds('/Users/romero61/../../capstone/pyforest/lup_simulation_data/results_5608/optimal_xy_50.rds') |> drop_units()
+
+# Hedges
+optimal_xy_hedges <-read_rds('/Users/romero61/../../capstone/pyforest/lup_simulation_data/results_5608/optimal_xy_hedges.rds') |> drop_units()
+```
+
+
+```{r}
+# properties with optimal aspect ratio for paddocks, paddock area to reach forestry
+# requirement
+# 
+optimal_mock_properties <- st_read('/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties_5.gpkg')
+
+optimal_mock_properties <- st_read('/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties_25.gpkg')
+
+optimal_mock_properties_50 <- st_read('/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties_50.gpkg')
+
+optimal_mock_properties_hedges <- st_read('/Users/romero61/../../capstone/pyforest/data/optimal_mock_properties/optimal_mock_properties_hedges.gpkg')
+```
+
+
+
+```{r}
+
+department <- st_read('/Users/romero61/../../capstone/pyforest/data/political_boundaries/departamento.shp')
+
+district <- st_read('/Users/romero61/../../capstone/pyforest/data/political_boundaries/distritos.shp')
+
+```
+# 5% Forest Reserve add in department and disrtict information
+
+```{r}
+
+optimal_combined_5 <- optimal_mock_properties |>
+  select(cat) |>
+  left_join(optimal_xy_5, by = 'cat') 
+
+
+
+```
+
+
+In cases where properties lie on the border of departments, a  join may result in duplicate rows because the property intersects with multiple department polygons. Join each property to only one department based on certain criteria, such as the department with the largest area of intersection.
+
+```{r}
+intersections <- st_intersection(optimal_combined_5, department)
+
+intersections <- intersections |>
+  mutate(intersection_area = st_area(intersections)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-intersection_area)
+```
+
+
+```{r}
+
+intersect_dist <- st_intersection(intersections, district)
+
+optimal_5 <- intersect_dist |>
+  mutate(intersection_area = st_area(intersect_dist)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-c(intersection_area, fechact, usuario, situacion, estado, cod_dpto, id.1,id, objectid)) |>
+  rename(district_area = area_km2) |>
+  mutate(distric_area_unit = 'km^2', .before = codigo) |>
+  st_drop_geometry()
+
+#write_rds(optimal_5,'/Users/romero61/../../capstone/pyforest/shinydata/complete_sim_5.rds')
+
+
+```
+
+# 25% Forest Reserve add in department and disrtict information
+
+```{r}
+
+optimal_combined_25 <- optimal_mock_properties |>
+  select(cat) |>
+  left_join(optimal_xy_25, by = 'cat') 
+
+
+
+```
+
+
+In cases where properties lie on the border of departments, a  join may result in duplicate rows because the property intersects with multiple department polygons. Join each property to only one department based on certain criteria, such as the department with the largest area of intersection.
+
+```{r}
+intersections <- st_intersection(optimal_combined_25, department)
+
+intersections <- intersections |>
+  mutate(intersection_area = st_area(intersections)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-intersection_area)
+```
+
+
+```{r}
+
+intersect_dist <- st_intersection(intersections, district)
+
+optimal_25 <- intersect_dist |>
+  mutate(intersection_area = st_area(intersect_dist)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-c(intersection_area, fechact, usuario, situacion, estado, cod_dpto, id.1,id, objectid)) |>
+  rename(district_area = area_km2) |>
+  mutate(distric_area_unit = 'km^2', .before = codigo) |>
+  st_drop_geometry()
+
+#write_rds(optimal_25,'/Users/romero61/../../capstone/pyforest/shinydata/complete_sim_25.rds')
+
+
+```
+
+
+
+# 50% Forest Reserve add in department and disrtict information
+
+
+
+```{r}
+
+optimal_combined_50 <- optimal_mock_properties_50 |>
+  select(cat) |>
+  left_join(optimal_xy_50, by = 'cat') 
+
+
+
+```
+
+
+In cases where properties lie on the border of departments, a  join may result in duplicate rows because the property intersects with multiple department polygons. Join each property to only one department based on certain criteria, such as the department with the largest area of intersection.
+
+```{r}
+intersections_50 <- st_intersection(optimal_combined_50, department)
+
+intersections_50 <- intersections_50 |>
+  mutate(intersection_area = st_area(intersections_50)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-intersection_area)
+```
+
+
+```{r}
+
+intersect_dist_50 <- st_intersection(intersections_50, district)
+
+optimal_50 <- intersect_dist_50 |>
+  mutate(intersection_area = st_area(intersect_dist_50)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-c(intersection_area, fechact, usuario, situacion, estado, cod_dpto, id.1,id, objectid)) |>
+  rename(district_area = area_km2) |>
+  mutate(distric_area_unit = 'km^2', .before = codigo) |>
+  st_drop_geometry()
+
+#write_rds(optimal_50,'/Users/romero61/../../capstone/pyforest/shinydata/complete_sim_50.rds')
+#
+
+```
+
+
+
+
+# Hedges included in 25% Forest Reserve add in department and disrtict information
+
+
+```{r}
+
+optimal_combined_hedges <- optimal_mock_properties_hedges |>
+  select(cat) |>
+  left_join(optimal_xy_hedges, by = 'cat') 
+
+
+
+```
+
+
+In cases where properties lie on the border of departments, a  join may result in duplicate rows because the property intersects with multiple department polygons. Join each property to only one department based on certain criteria, such as the department with the largest area of intersection.
+
+```{r}
+intersections_hedges <- st_intersection(optimal_combined_hedges, department)
+
+intersections_hedges <- intersections_hedges |>
+  mutate(intersection_area = st_area(intersections_hedges)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-intersection_area)
+```
+
+
+```{r}
+
+intersect_dist_hedges <- st_intersection(intersections_hedges, district)
+
+optimal_hedges <- intersect_dist_hedges |>
+  mutate(intersection_area = st_area(intersect_dist_hedges)) |>
+  group_by(cat) %>% # Replace 'cat' with the property ID column name in your dataset, if necessary
+  slice_max(intersection_area) |>
+  select(-c(intersection_area, fechact, usuario, situacion, estado, cod_dpto, id.1,id, objectid)) |>
+  rename(district_area = area_km2) |>
+  mutate(distric_area_unit = 'km^2', .before = codigo) |>
+  st_drop_geometry()
+
+#write_rds(optimal_hedges,'/Users/romero61/../../capstone/pyforest/shinydata/simulation/complete_sim_hedges.rds')
+
+
+```
+
+# Simulations Combined
+
+```{r}
+
+optimal_5 <- read_rds('/Users/romero61/../../capstone/pyforest/shinydata/simulation/complete_sim_5.rds')
+optimal_25 <- read_rds('/Users/romero61/../../capstone/pyforest/shinydata/simulation/complete_sim_25.rds')
+optimal_50 <- read_rds('/Users/romero61/../../capstone/pyforest/shinydata/simulation/complete_sim_50.rds')
+optimal_hedges<- read_rds('/Users/romero61/../../capstone/pyforest/shinydata/simulation/complete_sim_hedges.rds')
+
+
+# Combine all datasets
+optimal_5$simulation <- "5% Forest Reserve"
+optimal_25$simulation <- "25% Forest Reserve"
+optimal_50$simulation <- "50% Forest Reserve"
+optimal_hedges$simulation <- "Hedgerow incl. 25% Forest Reserve"
+
+combined_data <- bind_rows(optimal_5,optimal_25,optimal_50, optimal_hedges)
+#write_rds(combined_data,'/Users/romero61/../../capstone/pyforest/shinydata/simulation/combined_sim_results.rds')
+```
+
+# Subsets
+
+
+
+
+
+```{r}
+total_area_by_department <- combined_data %>%
+  group_by(simulation,nom_dpto) %>%
+  summarise(total_undeveloped_area = sum(property_area, na.rm = TRUE) / 10000)
+
+total_area_by_district <- combined_data %>%
+  group_by(simulation,nom_dpto, nom_dist) %>%
+  summarise(total_undeveloped_area = sum(property_area, na.rm = TRUE) / 10000)
+total_area_by_department
+total_area_by_district
+```
+
+
+
+```{r}
+# Calculate the total area for each land use type per department
+area_by_department_land_use <- combined_data %>%
+  pivot_longer(
+    cols = c(fr_area, paddocks_area, hedgerow_area, riparian_area),
+    names_to = "land_use_type",
+    values_to = "area") %>%
+  group_by(simulation,nom_dpto, land_use_type) %>%
+  summarise(total_area_lu = sum(area, na.rm = TRUE) / 10000)
+
+# Calculate the total area for each land use type per district
+area_by_district_land_use <- combined_data %>%
+  pivot_longer(
+    cols = c(fr_area, paddocks_area, hedgerow_area, riparian_area),
+    names_to = "land_use_type",
+    values_to = "area") %>%
+  group_by(simulation,nom_dist, land_use_type) %>%
+  summarise(total_area_lu = sum(area, na.rm = TRUE)/ 10000)
+area_by_department_land_use
+area_by_district_land_use
+
+```
+
+
+
+
+```{r}
+
+# Merge the two datasets and calculate the percentage of each land use type
+area_pct_by_department_land_use <- area_by_department_land_use %>%
+  left_join(total_area_by_department, by = c("nom_dpto", "simulation")) %>%
+  mutate(percentage = total_area_lu / total_undeveloped_area * 100)
+area_pct_by_department_land_use
+
+```
+
+
+```{r}
+# Merge the two datasets and calculate the percentage of each land use type
+area_pct_by_district_land_use <- area_by_district_land_use %>%
+  left_join(total_area_by_district, by = c("nom_dist", "simulation")) %>%
+  mutate(percentage = total_area_lu/ total_undeveloped_area * 100)
+area_pct_by_district_land_use
+
+```
+```{r}
+# Write four data sets created from results
+# write_rds(area_by_department_land_use,'/Users/romero61/../../capstone/pyforest/shinydata/simulation/area_by_department_land_use.rds')
+# write_rds(area_by_district_land_use,'/Users/romero61/../../capstone/pyforest/shinydata/simulation/area_by_district_land_use.rds')
+# write_rds(area_pct_by_department_land_use,'/Users/romero61/../../capstone/pyforest/shinydata/simulation/area_pct_by_department_land_use.rds')
+# write_rds(area_pct_by_district_land_use,'/Users/romero61/../../capstone/pyforest/shinydata/simulation/area_pct_by_district_land_use.rds')
+```
+
+
+
+
+
