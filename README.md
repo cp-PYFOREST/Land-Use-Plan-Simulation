@@ -11,7 +11,8 @@ Informing Forest Conservation Regulations in Paraguay
 </h2>
 
 <p align="center">
-![Banner](https://github.com/cp-PYFOREST/Land-Use-Plan-Simulation/blob/b31f243a025d718321b7ec219f0e091dc9856a81/img/logo.png)</p>
+<src="https://github.com/cp-PYFOREST/Land-Use-Plan-Simulation/blob/b31f243a025d718321b7ec219f0e091dc9856a81/img/logo.png">
+</p>
 
 # Land-Use-Plan-Simulation
 
