@@ -51,7 +51,7 @@ Table 2: Data Information
 
 | Dataset | Year(s) | Source | Data Type | Spatial Reference/Resolution | Metadata |
 
-|---------|----------|----------||---------|----------|
+|---------|----------|----------|---------|----------|----------|
 
 | C. Permitted land use  |	1994-2022	INFONA	Polygons |	CRS: WGS 84 / UTM zone 21S |	Metadata |
 
