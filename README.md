@@ -12,7 +12,7 @@ Informing Forest Conservation Regulations in Paraguay
 
 <h2 align="center">
 
-![Banner](https://github.com/cp-PYFOREST/Land-Use-Plan-Simulation/blob/main/img/pyforest_hex_sticker.png)
+<img src="https://github.com/cp-PYFOREST/Land-Use-Plan-Simulation/blob/main/img/pyforest_hex_sticker.png" alt="Banner" width="200">
 
 </h2>
 
