@@ -51,6 +51,7 @@ To quantify the designated forest reserve in the undeveloped Chaco under current
 3. Once the optimal dimension was determined for each property, the create_maps_with_optimal_dimensions.qmd was created for each simulation. This follows the same process as the previous pass and returns a dataset of the polygons of the category types created with the optimal dimensions for visualizations. 
 
 4. The final simulation of allowing the hedgerows between paddocks to be counted towards the 25% minimum required reorganizing the lup_simulator.qmd file and the order of functions called. Changes are reflected in the following:
+
 | Filename | 
 |---------|
 | lup_simulator_hedges.qmd |  
