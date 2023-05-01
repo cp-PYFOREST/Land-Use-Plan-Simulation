@@ -48,8 +48,11 @@ o	The final simulation of allowing the hedgerows between paddocks to be counted 
 	create_maps_with_optimal_dimensions_hedges.qmd.
 
 Table 2: Data Information
+
 | Dataset | Year(s) | Source | Data Type | Spatial Reference/Resolution | Metadata |
+
 |---------|----------|----------||---------|----------|
+
 | C. Permitted land use  |	1994-2022	INFONA	Polygons |	CRS: WGS 84 / UTM zone 21S |	Metadata |
 
 | D. Wildlife Protection Areas |	2022 |	Ministry of the Environment and Sustainable Development	Polygons | 	CRS: WGS 84 / UTM zone 21S | 	Metadata |
