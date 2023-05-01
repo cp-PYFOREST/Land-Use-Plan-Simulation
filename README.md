@@ -50,13 +50,13 @@ To quantify the designated forest reserve in the undeveloped Chaco under current
 > o	The first three simulations ran varied in the amount of forest reserve requirement, 5%, 25%, and 50%. A new create_optimal_dimensions.qmd file was created for each simulation where after the first pass of each property through the functions, the dataset was filtered repeatedly and reran, lowering the paddock size each time to ensure that every property was below a three percent margin of error but above the minimum requirement. The repeated process could have been incorporated into the parallel process, but the process was done manually to remain consistent and maintain a quality check. This process returns the optimal dimensions to reach the minimum forest reserve and provides the area statistics for each category type within a property. 
 
 > o	Once the optimal dimension was determined for each property, the create_maps_with_optimal_dimensions.qmd was created for each simulation. This follows the same process as the previous pass and returns a dataset of the polygons of the category types created with the optimal dimensions for visualizations. 
-
+>
 > o	The final simulation of allowing the hedgerows between paddocks to be counted towards the 25% minimum required reorganizing the lup_simulator.qmd file and the order of functions called. Changes are reflected in the following:
-
+>
 >> 	lup_simulator_hedges.qmd, 
-
+>
 >> 	create_optimal_dimensions_hedges.qmd, and 
-
+>
 >> 	create_maps_with_optimal_dimensions_hedges.qmd.
 
 Table 2: Data Information
