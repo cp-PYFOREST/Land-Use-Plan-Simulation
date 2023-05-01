@@ -51,7 +51,7 @@ Table 2: Data Information
 
 | Dataset | Year(s) | Source | Data Type | Spatial Reference/Resolution | Metadata |
 |---------|----------|----------|---------|----------|----------|
-| C. Permitted land use  |	1994-2022	INFONA |	Polygons |	CRS: WGS 84 / UTM zone 21S | Metadata |
+| C. Permitted land use  |	1994-2022	INFONA | Polygons |	CRS: WGS 84 / UTM zone 21S | Metadata |
 | D. Wildlife Protection Areas |	2022 |	Ministry of the Environment and Sustainable Development |	Polygons | 	CRS: WGS 84 / UTM zone 21S | 	Metadata |
 | E. Indigenous Land |	2022 |	Federation for the Self-determination of Indigenous Peoples |	Polygons |	CRS: WGS 84 / UTM zone 21S |	Metadata |
 | F. Forest Biome |	2022 |	INFONA |	Polygons |	CRS: WGS 84 / UTM zone 21S |	Metadata |
