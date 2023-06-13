@@ -64,10 +64,10 @@ These scenarios were selected to evaluate and compare the potential outcomes of 
 
 Within the study boundary, two distinct regions are defined:
 
-> 1. **The developed region** takes into account urban areas (including roadways), indigenous lands, national parks, and all private cattle ranches registered with INFONA. To develop a ranch, the
-> landowners require deforesting part of the property to plant grass for cattle. Deforestation occurring within the property requires submission of a LUP for approval by INFONA.
->
-> 2. **The undeveloped region**, which accounts for approximately 40% of the Paraguayan Chaco, is defined as the study area excluding the developed region.
+1. **The developed region** takes into account urban areas (including roadways), indigenous lands, national parks, and all private cattle ranches registered with INFONA. To develop a ranch, the
+landowners require deforesting part of the property to plant grass for cattle. Deforestation occurring within the property requires submission of a LUP for approval by INFONA.
+
+2. **The undeveloped region**, which accounts for approximately 40% of the Paraguayan Chaco, is defined as the study area excluding the developed region.
 
 The undeveloped region is composed of properties that are likely to become cattle ranches in the future. This area lacks property boundaries and associated LUPs, motivating our creation of mock properties and simulated LUPs, under current and alternative forest laws, in the undeveloped region. 
 
