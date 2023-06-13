@@ -44,7 +44,7 @@ Informing Forest Conservation Regulations in Paraguay
 
 To quantify the area of forest that would be designated for protection under current and alternative laws, we have developed a simulation model that divides the undeveloped Paraguayan Chaco into mock properties. We apply custom functions for each mock property that generate LUP configurations based on the specified legal requirements. By simulating various scenarios with different conservation requirements, we can estimate the potential impact of policy changes on forest conservation in the Paraguayan Chaco.
 
-_Current Forest Law_
+- _Current Forest Law_
 This scenario follows the current policy and legal requirements for LUPs enforced by INFONA. It includes a 25% forest reserve, a 100-meter hedgerow buffer, a 100-meter riparian forest, and paddocks of less than 100 ha for authorized deforestation. The purpose of this scenario is to simulate the continuation of existing practices and policies without any significant changes (Paraguay, 1986; Paraguay, 1995).
 
 ### **Alternative Forest Laws**
