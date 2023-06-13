@@ -49,13 +49,13 @@ This scenario follows the current policy and legal requirements for LUPs enforce
 
 ### **Alternative Forest Laws**
 
-_Promotes Forest Conservation_
+- _Promotes Forest Conservation_
 This scenario aims to enhance forest conservation efforts. It proposes increasing the forest reserve requirement to 50%, along with maintaining a 100-meter hedgerow buffer, a 100-meter riparian forest, and paddocks of less than 100 ha. The objective is to simulate the potential outcomes of a policy that was proposed in Paraguay’s National Congress in 2017 that would prioritize the preservation and protection of forests (National Congress, 2017).
 
-_Prioritize Cattle Production_
+- _Prioritize Cattle Production_
 This scenario aims to find a balance between cattle production and forest conservation. It proposes a 25% total forest cover, which includes the combined area of the 100-meter riparian forest and 100-meter hedgerow buffer. Any additional forest area required to reach the 25% target would be designated as forest reserve. This policy includes paddocks of less than 100 ha. The intention is to simulate potential effects of a policy goal that prioritizes land use for economic purposes, while maintaining a 25% forest cover goal.
 
-_Law Ambiguity_
+- _Law Ambiguity_
 This scenario addresses a potential ambiguity in the law's interpretation. It suggests that if a property has been deforested beyond the approved amount, an immediate reforestation of 5% of the property is required in the areas of forest reserve. This is in addition to maintaining the 100-meter hedgerow buffer, the 100-meter riparian forest, and paddocks of less than 100 ha. However, some property owners have interpreted this policy as allowing them to deforest their entire property and only needing to replant 5%. This misinterpretation could lead to substantial deforestation, undermining the current forest law’s original intent (National Congress, 2009).
 
 These scenarios were selected to evaluate and compare the potential outcomes of different policy approaches concerning land use planning and forest conservation. Simulating a range of scenarios makes it possible to assess the trade-offs, benefits, and impacts associated with each policy option. The chosen scenarios represent distinct policy directions that Paraguay has considered adopting. 
