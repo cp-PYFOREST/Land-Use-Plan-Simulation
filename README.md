@@ -135,7 +135,7 @@ Table 2: Data Information
 
 <h2 align="center">
 
-<img src="https://github.com/cp-PYFOREST/.github/blob/main/img/obj2-result.png" alt="SIM Results">
+<img src="https://github.com/cp-PYFOREST/.github/blob/main/img/simulations-bg.jpg" alt="SIM Results">
 
 </h2>
 
